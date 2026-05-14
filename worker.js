@@ -312,7 +312,13 @@ async function scrapeReviews(page, diag) {
       const agoRe = new RegExp(agoSrc, 'i');
       const editedRe = new RegExp(editedSrc, 'i');
       const out = [];
+      // Dedupe by data-review-id — Google renders each review in multiple
+      // DOM positions (main card + virtual-scroll twin / translated copy),
+      // so the raw count comes out ~6x the actual review total.
+      const seen = new Set();
       document.querySelectorAll('[data-review-id]').forEach(item => {
+        const id = item.getAttribute('data-review-id') || '';
+        if (seen.has(id)) return;
         let stars = null;
         for (const el of item.querySelectorAll('[aria-label]')) {
           const lbl = el.getAttribute('aria-label') || '';
@@ -328,7 +334,10 @@ async function scrapeReviews(page, diag) {
           const m = t.match(editedRe);
           if (m) { ago = m[1]; break; }
         }
-        if (ago && stars != null) out.push({ ago, stars });
+        if (ago && stars != null) {
+          seen.add(id);
+          out.push({ ago, stars });
+        }
       });
       return out;
     }, AGO_RE_SRC, EDITED_AGO_RE_SRC);
