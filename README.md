@@ -1,60 +1,49 @@
 # Pharmacy Review Tracker
 
-A single-file dashboard that compares your pharmacy against competitors on Google Maps. No server, no API key, no account.
+A single-file dashboard that tracks your pharmacy's Google rating + review count against competitors over time, and tells you exactly how many more 5★ reviews you need to hit a target. Runs from `index.html` — no server, no account, no API key.
 
 ## Quick start
 
-1. Download `index.html`.
-2. Open it in your browser — that's it. It auto-refreshes once on first load.
-3. Click **Settings** → paste your pharmacy URLs (one per line), prefix your own pharmacy with `*`:
+1. Open `index.html` (or visit the GitHub Pages URL it's hosted at).
+2. Hit **Settings** → paste your pharmacies (one per line). Prefix your own with `*`:
 
    ```
-   * Potter's Pharmacy | https://www.google.com/maps/place/Potter's+Pharmacy...
-   Competitor A       | https://www.google.com/maps/place/Competitor+A...
-   Competitor B       | https://www.google.com/maps/place/Competitor+B...
+   * Potter's Pharmacy St. Julian's | https://www.google.com/maps/place/Potter's+Pharmacy...
+   Competitor A                    | https://www.google.com/maps/place/Competitor+A...
+   Competitor B                    | https://www.google.com/maps/place/Competitor+B...
    ```
 
-4. Click **Refresh all**. The dashboard pulls each Maps page through a free CORS proxy, extracts rating + review count + (when present) the 1–5★ distribution, and stores a daily snapshot in `localStorage`.
+3. Click **Open all in Maps** — tabs open for every pharmacy.
+4. Glance at each Maps panel (rating + total review count). Back in the dashboard, type those numbers into the form rows (one per pharmacy). Optionally paste the 1★/2★/3★/4★/5★ counts too (Maps shows them when you click the rating).
+5. Click **Save snapshot**. The dashboard updates: overview, comparison table, history chart, distributions, target calculator.
 
-Hit **Refresh all** weekly. The history chart fills in over time.
+Repeat weekly (or whenever you want a data point). Two snapshots in, you get 7-day deltas. Several snapshots in, the history chart fills out and the target calculator estimates how long your campaign will take.
+
+Whole loop is under a minute once it's set up.
 
 ## What you get
 
-- **Overview**: your rating, total reviews, rank vs competitors, 7-day deltas.
-- **Comparison table**: sortable, with Δ reviews / Δ rating since a week ago.
-- **History chart**: review-count timeline per pharmacy (your pharmacy highlighted).
-- **Star distribution**: when Maps exposes it in the page, the 1–5★ bars show up.
+- **Overview**: your rating, total reviews, rank vs competitors, 7-day deltas — visible the moment you save a snapshot.
+- **Snapshot form**: pre-filled with last entries, so most weeks it's just bumping a couple of numbers.
+- **Comparison table**: sortable, with Δ reviews / Δ rating since 7 days ago.
+- **History chart**: review-count timeline per pharmacy, your pharmacy highlighted gold.
+- **Star distribution**: 1★–5★ bars per pharmacy (when you enter them).
 - **Target calculator**: "to go from 4.7 → 4.8, you need N more 5★ reviews; at your current pace, that's ~M weeks."
-- **CSV/JSON export** so the data is yours.
+- **Bulk paste** (under Settings): paste all rows at once instead of editing per-row.
+- **CSV + JSON export** so the data is yours.
 
-## Why this works (and why my first answer was wrong)
+## Why no auto-scraping
 
-CORS is a browser-policy rule, not a network rule. The local HTML can't fetch `google.com` directly because the browser blocks the read — but a tiny proxy that fetches the page server-side and returns it with `Access-Control-Allow-Origin: *` works fine. The Maps HTML response contains the place data embedded in a JSON blob, so a few targeted regexes are enough to extract rating + review count.
+I tried. Google Maps doesn't include rating/review data in the HTML you get from `fetch()` — the data is loaded by JavaScript after the page hydrates. Even routed through CORS proxies, the response is just the JS app shell with the place name and coordinates, no rating. Public proxies that used to work (`corsproxy.io`) have moved to paid plans; the rest either rate-limit or get served the same useless shell because Google geo-routes from datacenter IPs.
 
-Defaults to **corsproxy.io** (free, no signup). Falls back to allorigins.win or codetabs.com. For reliability, deploy your own (below).
+The only ways to actually automate this are:
+- Paid APIs (Google Place Details, SerpApi) — works but costs money
+- Headless-browser scraping (Puppeteer/Playwright) — needs a server, not a local HTML file
+- The Business Profile API — your own pharmacy only, and requires verification
 
-## Self-host the proxy (optional, recommended)
-
-Public proxies are rate-limited. `proxy-worker.js` is a ~30-line Cloudflare Worker that gives you 100k requests/day free, restricted to Google Maps hosts so nobody else can abuse it.
-
-1. https://dash.cloudflare.com → Workers & Pages → Create → Worker.
-2. Paste `proxy-worker.js` → Save and deploy.
-3. Copy the worker URL.
-4. In the dashboard: Settings → CORS proxy → Custom → `https://your-worker.workers.dev/?url={url}`.
-
-## When scraping fails
-
-Google occasionally changes the page structure. If a row shows "no data — refresh" repeatedly:
-
-1. Try a different proxy under Settings.
-2. Or fill the **Manual data** field (one line per pharmacy):
-   ```
-   Potter's Pharmacy | 4.7 | 348 | 12,4,8,31,293
-   ```
-   Manual entries override scraped values and still get snapshotted on refresh, so your history still grows.
+For a free, local, weekly-ish workflow, manual entry beats all of them. Reading four numbers off a Maps tab takes ten seconds; the dashboard does the analytics.
 
 ## Notes
 
-- Everything stays on your machine — `localStorage` only. Nothing is sent anywhere except the proxy you configure.
-- Use this for private benchmarking. Don't republish competitor review text.
-- Google's terms allow asking real customers for honest reviews; they don't allow incentives or "5-star only" solicitation. Keep your campaign clean — a sudden burst of 5★s from new accounts is exactly what their spam filters look for.
+- All data lives in `localStorage`. Nothing leaves your browser. Export JSON if you switch devices or browsers.
+- Google's terms allow asking real customers for honest reviews; they don't allow incentives or "5-star only" solicitation. A sudden burst of new-account 5★s is exactly what their spam filter looks for — keep the campaign clean.
