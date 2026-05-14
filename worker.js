@@ -69,14 +69,20 @@ export default {
         { name: 'CONSENT', value: 'YES+cb', domain: '.google.com', path: '/' }
       );
 
-      await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Force English UI so our "N stars, M reviews" regexes match regardless
+      // of the IP-geolocated locale Google would otherwise pick.
+      const goUrl = withParam(target, 'hl', 'en');
+      await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // Fallback: if we still landed on consent.google.com (cookie didn't
       // stick, or Google rolled the format), click whichever localised
-      // "Accept all" / "Reject all" button is on the page — either dismisses
-      // the interstitial and forwards us to the real destination.
+      // "Accept all" / "Reject all" button is on the page, then re-navigate
+      // to the target so we own the post-consent page state.
       if (await isConsentPage(page)) {
         await dismissConsent(page);
+        if (await isConsentPage(page)) {
+          await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        }
       }
 
       // Wait until the rating + a review count appear in body text. This is the
@@ -116,6 +122,16 @@ function json(obj, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' }
   });
+}
+
+function withParam(rawUrl, key, value) {
+  try {
+    const u = new URL(rawUrl);
+    if (!u.searchParams.has(key)) u.searchParams.set(key, value);
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
 }
 
 async function isConsentPage(page) {
