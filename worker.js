@@ -60,7 +60,24 @@ export default {
       await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
       await page.setViewport({ width: 1280, height: 900 });
 
+      // Cloudflare's Browser Rendering egress is often EU-based, so Google
+      // serves its "Before you continue" consent interstitial before the
+      // Maps content. Pre-set the accept cookies so we skip the gate.
+      await page.setCookie(
+        { name: 'SOCS', value: 'CAESEwgDEgk0NzgwODA4MzMaAmVuIAEaBgiA_LyaBg',
+          domain: '.google.com', path: '/', secure: true, sameSite: 'Lax' },
+        { name: 'CONSENT', value: 'YES+cb', domain: '.google.com', path: '/' }
+      );
+
       await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // Fallback: if we still landed on consent.google.com (cookie didn't
+      // stick, or Google rolled the format), click whichever localised
+      // "Accept all" / "Reject all" button is on the page — either dismisses
+      // the interstitial and forwards us to the real destination.
+      if (await isConsentPage(page)) {
+        await dismissConsent(page);
+      }
 
       // Wait until the rating + a review count appear in body text. This is the
       // signal that JS hydration is done.
@@ -99,6 +116,33 @@ function json(obj, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' }
   });
+}
+
+async function isConsentPage(page) {
+  return await page.evaluate(() => {
+    if (/(^|\.)consent\.google\.com$/.test(location.hostname)) return true;
+    if (/\/consent[\/?]/i.test(location.pathname + location.search)) return true;
+    if (document.querySelector('form[action*="consent.google.com"]')) return true;
+    // Localised titles seen in the wild for the "Before you continue" gate.
+    return /^(Before you continue|Avant d.accéder|Antes de (?:acceder|continuar|ir)|Antes de (?:aceder|continuares)|Bevor du|Voordat je|Prima di (?:andare|accedere|continuare)|Innan du|Inden du|Ennen kuin|Zanim przejdziesz|Bevor Sie)/i
+      .test(document.title || '');
+  });
+}
+
+async function dismissConsent(page) {
+  const clicked = await page.evaluate(() => {
+    const labels = /^(Accept all|I agree|Reject all|Tout accepter|Tout refuser|Alle akzeptieren|Alle ablehnen|Aceptar todo|Rechazar todo|Accetta tutto|Rifiuta tutto|Aceitar tudo|Rejeitar tudo|Alles accepteren|Alles weigeren|Godkänn alla|Avvisa alla|Acceptér alle|Afvis alle|Hyväksy kaikki|Hylkää kaikki|Zaakceptuj wszystko|Odrzuć wszystko)/i;
+    const candidates = Array.from(document.querySelectorAll('button, [role="button"], form button, input[type=submit]'));
+    const btn = candidates.find(el => labels.test((el.innerText || el.textContent || el.value || '').trim()));
+    if (btn) { btn.click(); return true; }
+    // Last-resort: submit any visible consent form.
+    const form = document.querySelector('form[action*="consent"]');
+    if (form) { form.submit(); return true; }
+    return false;
+  });
+  if (clicked) {
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+  }
 }
 
 /* Runs inside the rendered Maps page (no closure access to Worker scope). */
