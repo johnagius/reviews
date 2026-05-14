@@ -107,13 +107,14 @@ export default {
         }, { timeout: 4000 }).catch(() => {});
       } catch (e) {}
 
-      // Scroll the reviews list and pull each review's relative date + stars
-      // so the dashboard can render a "when were reviews posted" timeline.
-      // Clicking the rating above already opens the reviews panel.
-      const reviews = await scrapeReviews(page).catch(() => []);
-
+      // Extract rating/reviewCount/dist while the rating panel is still open
+      // and the DOM is in the stable state extractInPage was written against.
       const data = await page.evaluate(extractInPage);
-      data.reviews = reviews;
+
+      // Now scrape individual reviews. This may navigate to the Reviews tab
+      // and disturb the rest of the DOM, so we run it last.
+      data.reviews = await scrapeReviews(page).catch(() => []);
+
       return json(data);
     } catch (e) {
       return json({ error: String(e && e.message || e) }, 502);
@@ -151,25 +152,32 @@ async function isConsentPage(page) {
   });
 }
 
+const REVIEW_ITEM_SELECTOR =
+  '[data-review-id], div[jscontroller][jsdata*="review"], div[aria-label][jslog*="review"]';
+
 async function scrapeReviews(page) {
-  // If the rating click didn't open the reviews panel (e.g. it failed), try
-  // clicking a "Reviews" tab as a fallback.
-  await page.evaluate(() => {
-    if (document.querySelector('[data-review-id]')) return;
+  // Open the Reviews tab/panel. Try the standard "Reviews" tab first, then
+  // any "See all reviews" / "more reviews" button as a fallback.
+  await page.evaluate((sel) => {
+    if (document.querySelector(sel)) return;
+    const visibleText = el => ((el.innerText || el.textContent || '').trim().split('\n')[0] || '').toLowerCase();
     const tabs = Array.from(document.querySelectorAll('button[role="tab"], div[role="tab"]'));
-    const reviewsTab = tabs.find(t => /^reviews$/i.test(((t.innerText || t.textContent || '').trim().split('\n')[0])));
-    if (reviewsTab && reviewsTab.getAttribute('aria-selected') !== 'true') {
-      (reviewsTab.closest('button') || reviewsTab).click();
+    const tab = tabs.find(t => visibleText(t) === 'reviews');
+    if (tab && tab.getAttribute('aria-selected') !== 'true') {
+      (tab.closest('button') || tab).click();
+      return;
     }
-  });
+    const more = Array.from(document.querySelectorAll('button, a[role="button"]'))
+      .find(el => /^(see all reviews|more reviews|all reviews|view all reviews)/i.test(visibleText(el)));
+    if (more) (more.closest('button') || more).click();
+  }, REVIEW_ITEM_SELECTOR);
 
-  await page.waitForSelector('[data-review-id]', { timeout: 8000 }).catch(() => {});
+  await page.waitForSelector(REVIEW_ITEM_SELECTOR, { timeout: 10000 }).catch(() => {});
 
-  // Scroll the reviews list container until lazy-loading stops adding entries
-  // (or we hit the safety cap).
-  await page.evaluate(async () => {
+  // Scroll the reviews container until lazy-loading stops adding entries.
+  await page.evaluate(async (sel) => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const first = document.querySelector('[data-review-id]');
+    const first = document.querySelector(sel);
     if (!first) return;
     let scroller = first.parentElement;
     while (scroller && scroller !== document.body) {
@@ -178,30 +186,40 @@ async function scrapeReviews(page) {
           && scroller.scrollHeight > scroller.clientHeight + 4) break;
       scroller = scroller.parentElement;
     }
-    if (!scroller || scroller === document.body) return;
-
-    const HARD_CAP_REVIEWS = 1500;
-    const MAX_ITER = 250;
-    let lastCount = 0, stable = 0;
+    if (!scroller || scroller === document.body) {
+      // Last resort: scroll the window itself.
+      scroller = document.scrollingElement || document.documentElement;
+    }
+    const HARD_CAP = 1500, MAX_ITER = 300;
+    let last = 0, stable = 0;
     for (let i = 0; i < MAX_ITER && stable < 4; i++) {
       scroller.scrollTop = scroller.scrollHeight;
       await sleep(350);
-      const cur = document.querySelectorAll('[data-review-id]').length;
-      if (cur >= HARD_CAP_REVIEWS) break;
-      if (cur === lastCount) stable++;
-      else { stable = 0; lastCount = cur; }
+      const cur = document.querySelectorAll(sel).length;
+      if (cur >= HARD_CAP) break;
+      if (cur === last) stable++;
+      else { stable = 0; last = cur; }
     }
-  });
+  }, REVIEW_ITEM_SELECTOR);
 
-  return await page.evaluate(() => {
+  return await page.evaluate((sel) => {
     const out = [];
-    document.querySelectorAll('[data-review-id]').forEach(item => {
+    const seen = new Set();
+    document.querySelectorAll(sel).forEach(item => {
+      const id = item.getAttribute('data-review-id') || item.outerHTML.slice(0, 80);
+      if (seen.has(id)) return;
+      seen.add(id);
+
       let stars = null;
-      const starEl = item.querySelector('[role="img"][aria-label*="star"], [aria-label$="stars"], [aria-label$=" star"]');
-      if (starEl) {
-        const m = (starEl.getAttribute('aria-label') || '').match(/(\d)\s+stars?/i);
-        if (m) stars = parseInt(m[1], 10);
+      // Try aria-label patterns the rating widget exposes: "5 stars" / "Rated 4.0 out of 5".
+      const starCandidates = item.querySelectorAll('[aria-label]');
+      for (const el of starCandidates) {
+        const lbl = el.getAttribute('aria-label') || '';
+        let m = lbl.match(/(?:^|\s)(\d)\s+stars?(?:\s|$|,)/i)
+             || lbl.match(/Rated\s+([1-5])(?:\.0)?\s+out of 5/i);
+        if (m) { stars = parseInt(m[1], 10); break; }
       }
+
       let ago = null;
       for (const s of item.querySelectorAll('span')) {
         const t = (s.textContent || '').trim();
@@ -214,7 +232,7 @@ async function scrapeReviews(page) {
       if (ago && stars != null) out.push({ ago, stars });
     });
     return out;
-  });
+  }, REVIEW_ITEM_SELECTOR);
 }
 
 async function dismissConsent(page) {
