@@ -193,7 +193,7 @@
   </section>
 
   <section>
-    <h2>Review submission timeline <span class="muted small" style="font-weight:normal; text-transform:none; letter-spacing:0">(your pharmacy — one dot per review, older dates spread across the "X years ago" window)</span></h2>
+    <h2>Review submission timeline <span class="muted small" style="font-weight:normal; text-transform:none; letter-spacing:0">(your pharmacy — cumulative count over time, one dot per review)</span></h2>
     <svg class="chart" id="timeline-chart" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
     <div class="legend" id="timeline-legend"></div>
   </section>
@@ -761,66 +761,65 @@ function renderTimeline() {
   const home = state.pharmacies.find(p => p.home) || state.pharmacies[0];
   const reviews = home ? latestReviews(home.name) : null;
 
-  const W = 800, H = 240, padL = 40, padR = 16, padT = 12, padB = 32;
+  const W = 800, H = 240, padL = 44, padR = 16, padT = 14, padB = 30;
   const ns = 'http://www.w3.org/2000/svg';
   if (!reviews || !reviews.length) {
     svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates yet — refresh after deploying the updated Worker.</text>`;
     return;
   }
 
-  // For each review, compute a position. X = a deterministic-random offset
-  // inside the review's "X years ago" uncertainty window, so older reviews
-  // spread out across that year instead of stacking on a single date.
+  // For each review, place it at a deterministic-random point inside its
+  // uncertainty window. This spreads "X years ago" clusters across that
+  // year rather than stacking them at a single instant, which is what makes
+  // the cumulative curve smooth instead of stair-stepping vertically.
   const seedRand = (n) => { const x = Math.sin(n) * 10000; return x - Math.floor(x); };
-  const now = Date.now();
-  const points = [];
+  const placed = [];
   reviews.forEach((r, i) => {
     const w = parseReviewAgo(r.ago);
     if (!w) return;
     const stars = (r.stars >= 1 && r.stars <= 5) ? r.stars : null;
     if (!stars) return;
-    const xFrac = seedRand(i * 17 + (r.ago || '').length * 31);
-    const yJitter = (seedRand(i * 71 + 3) - 0.5) * 0.55;
-    points.push({
-      t: w.startMs + (w.endMs - w.startMs) * xFrac,
-      stars,
-      yJitter,
-      ago: r.ago,
-    });
+    const frac = seedRand(i * 17 + (r.ago || '').length * 31);
+    placed.push({ t: w.startMs + (w.endMs - w.startMs) * frac, stars, ago: r.ago });
   });
-  if (!points.length) {
+  if (!placed.length) {
     svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates parsed.</text>`;
     return;
   }
 
-  let minT = Math.min(...points.map(p => p.t));
-  const maxT = Math.max(now, ...points.map(p => p.t));
-  // Pad left so leftmost dot isn't flush against the axis.
+  // Sort oldest → newest. The cumulative count at index i is i+1.
+  placed.sort((a, b) => a.t - b.t);
+
+  const now = Date.now();
+  let minT = placed[0].t;
+  const maxT = Math.max(now, placed[placed.length - 1].t);
   minT -= (maxT - minT) * 0.02;
 
+  const maxCount = placed.length;
   const xOf = t => padL + ((t - minT) / Math.max(1, maxT - minT)) * (W - padL - padR);
-  // Y: 1..5 stars, with a little headroom for jitter.
-  const yOf = stars => padT + ((5.5 - stars) / 5) * (H - padT - padB);
+  const yOf = c => padT + (1 - c / maxCount) * (H - padT - padB);
 
-  // Horizontal gridlines per star + Y axis labels.
-  for (let s = 1; s <= 5; s++) {
-    const y = yOf(s);
+  // Y gridlines + labels (5 evenly-spaced count ticks).
+  for (let i = 0; i <= 4; i++) {
+    const c = Math.round(maxCount * i / 4);
+    const y = yOf(c);
     const ln = document.createElementNS(ns, 'line');
     ln.setAttribute('x1', padL); ln.setAttribute('x2', W - padR);
     ln.setAttribute('y1', y); ln.setAttribute('y2', y);
     ln.setAttribute('stroke', '#232b3a');
     svg.appendChild(ln);
     const lbl = document.createElementNS(ns, 'text');
-    lbl.setAttribute('x', 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('x', padL - 6); lbl.setAttribute('y', y + 3);
     lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
-    lbl.textContent = `${s}★`;
+    lbl.setAttribute('text-anchor', 'end');
+    lbl.textContent = String(c);
     svg.appendChild(lbl);
   }
 
-  // X-axis ticks at year boundaries within the visible range.
+  // X-axis ticks at year boundaries.
   const minYear = new Date(minT).getFullYear();
   const maxYear = new Date(maxT).getFullYear();
-  const yearSpan = maxYear - minYear;
+  const yearSpan = Math.max(1, maxYear - minYear);
   const yearStep = yearSpan > 8 ? 2 : 1;
   for (let yr = minYear; yr <= maxYear; yr += yearStep) {
     const tickT = new Date(yr, 0, 1).getTime();
@@ -832,29 +831,71 @@ function renderTimeline() {
     ln.setAttribute('stroke', '#1b212c');
     svg.appendChild(ln);
     const t = document.createElementNS(ns, 'text');
-    t.setAttribute('x', x); t.setAttribute('y', H - 14);
+    t.setAttribute('x', x); t.setAttribute('y', H - 12);
     t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
     t.setAttribute('text-anchor', 'middle');
     t.textContent = String(yr);
     svg.appendChild(t);
   }
 
-  // Plot dots — one per review.
+  // Build the cumulative curve. Smooth it with a Catmull-Rom-style spline
+  // converted to SVG cubic Bezier segments, so the line glides between
+  // points instead of looking jagged.
+  const path = placed.map((p, i) => ({ x: xOf(p.t), y: yOf(i + 1) }));
+  // Extend the curve to "now" at the final count so the line reaches the
+  // right edge instead of dangling at the most-recent review.
+  path.push({ x: xOf(now), y: yOf(maxCount) });
+
+  const smoothPath = (pts) => {
+    if (pts.length < 2) return '';
+    let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+    }
+    return d;
+  };
+
+  // Fill under the curve, then the curve itself.
+  const fill = document.createElementNS(ns, 'path');
+  fill.setAttribute('d', smoothPath(path) +
+    ` L${(W - padR).toFixed(2)},${(H - padB).toFixed(2)} L${padL.toFixed(2)},${(H - padB).toFixed(2)} Z`);
+  fill.setAttribute('fill', '#4f8cff');
+  fill.setAttribute('fill-opacity', '0.12');
+  svg.appendChild(fill);
+
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('d', smoothPath(path));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', '#4f8cff');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linejoin', 'round');
+  line.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(line);
+
+  // Dots — one per review, colored by star, sitting on the curve.
   const starColor = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
-  for (const p of points) {
+  placed.forEach((p, i) => {
     const c = document.createElementNS(ns, 'circle');
     c.setAttribute('cx', xOf(p.t));
-    c.setAttribute('cy', yOf(p.stars + p.yJitter));
-    c.setAttribute('r', '3');
+    c.setAttribute('cy', yOf(i + 1));
+    c.setAttribute('r', '2.6');
     c.setAttribute('fill', starColor[p.stars]);
-    c.setAttribute('opacity', '0.7');
+    c.setAttribute('stroke', '#0f1115');
+    c.setAttribute('stroke-width', '0.5');
     const title = document.createElementNS(ns, 'title');
-    title.textContent = `${p.stars}★ — ${p.ago}`;
+    title.textContent = `#${i + 1}: ${p.stars}★ — ${p.ago}`;
     c.appendChild(title);
     svg.appendChild(c);
-  }
+  });
 
-  // Legend
   for (const star of [5, 4, 3, 2, 1]) {
     const k = document.createElement('div');
     k.className = 'key';
@@ -864,7 +905,7 @@ function renderTimeline() {
   const note = document.createElement('div');
   note.className = 'key muted';
   note.style.marginLeft = 'auto';
-  note.textContent = `${points.length} reviews — older dates spread across their "X years ago" window so density is visible.`;
+  note.textContent = `${placed.length} reviews — smooth cumulative growth, older dates spread across their "X years ago" window.`;
   legend.appendChild(note);
 }
 
