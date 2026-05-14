@@ -92,8 +92,14 @@ export default {
         return /(^|\s)[1-5]\.\d(\s|$)/m.test(t) && /\d+\s+(reviews?|Google reviews?)/i.test(t);
       }, { timeout: 15000 }).catch(() => {});
 
-      // Best-effort: click the rating so the 1★–5★ distribution panel opens
-      // and its aria-labels are available for extraction.
+      // Phase 1: extract name + rating + reviewCount from the *initial* place
+      // card view — before any clicks. After we open the rating breakdown each
+      // visible reviewer card has its own "X reviews" badge, and a broad
+      // button[aria-label*="reviews"] selector then matches a reviewer's badge
+      // instead of the place's total, returning a tiny count like 4.
+      const basic = await page.evaluate(extractNameRatingCount);
+
+      // Phase 2: click the rating to open the 1★–5★ distribution overlay.
       try {
         await page.evaluate(() => {
           const btn = document.querySelector('[role="img"][aria-label*="stars"]')
@@ -101,20 +107,23 @@ export default {
           if (btn) (btn.closest('button') || btn).click();
         });
         await page.waitForFunction(() => {
-          // Wait for distribution rows to appear (5 of them, each labelled "N stars, M reviews")
           return document.querySelectorAll('[aria-label*="stars,"]').length >= 5
               || document.querySelectorAll('[aria-label*=" star,"]').length >= 5;
         }, { timeout: 4000 }).catch(() => {});
       } catch (e) {}
 
-      // Extract rating/reviewCount/dist while the rating panel is still open
-      // and the DOM is in the stable state extractInPage was written against.
-      const data = await page.evaluate(extractInPage);
+      // Phase 3: extract dist while the breakdown overlay is open.
+      const dist = await page.evaluate(extractDistribution);
 
-      // Now scrape individual reviews. This may navigate to the Reviews tab
-      // and disturb the rest of the DOM, so we run it last.
-      data.reviews = await scrapeReviews(page).catch(() => []);
+      // Phase 4: scroll the reviews list and collect per-review dates/stars.
+      const reviews = await scrapeReviews(page).catch(() => []);
 
+      const debug = new URL(request.url).searchParams.get('debug') === '1'
+        ? await page.evaluate(collectDebug)
+        : undefined;
+
+      const data = { ...basic, dist, reviews };
+      if (debug) data._debug = debug;
       return json(data);
     } catch (e) {
       return json({ error: String(e && e.message || e) }, 502);
@@ -251,23 +260,24 @@ async function dismissConsent(page) {
   }
 }
 
-/* Runs inside the rendered Maps page (no closure access to Worker scope). */
-function extractInPage() {
-  const out = { name: null, rating: null, reviewCount: null, dist: null };
+/* Runs inside the rendered Maps page. Pulls name + rating + total review
+ * count from the *initial* place card view, BEFORE the rating breakdown
+ * overlay opens. Once that overlay is open each visible reviewer card has
+ * its own "X reviews" badge, so a broad button[aria-label*="reviews"]
+ * selector will then match the first reviewer and return a tiny count.
+ */
+function extractNameRatingCount() {
+  const out = { name: null, rating: null, reviewCount: null };
 
-  // --- Name -------------------------------------------------------------
   const h1 = document.querySelector('h1');
   if (h1) out.name = h1.textContent.trim();
 
-  // --- Rating -----------------------------------------------------------
-  // Prefer aria-label on the star icon ("Rated 4.7 out of 5" / "4.7 stars")
-  const ratingNodes = Array.from(document.querySelectorAll('[role="img"][aria-label], [aria-label]'));
-  for (const el of ratingNodes) {
+  // Rating: aria-label on the star icon ("Rated 4.7 out of 5" / "4.7 stars").
+  for (const el of document.querySelectorAll('[role="img"][aria-label], [aria-label]')) {
     const lbl = el.getAttribute('aria-label') || '';
     const m = lbl.match(/(?:Rated\s+|^|\s)([1-5][.,]\d)(?:\s*(?:out of 5|stars?|\/\s*5))/i);
     if (m) { out.rating = parseFloat(m[1].replace(',', '.')); break; }
   }
-  // Fallback: visible rating number inside the typical container
   if (out.rating == null) {
     const cand = document.querySelector('div.F7nice span[aria-hidden="true"]')
               || document.querySelector('div.fontDisplayLarge');
@@ -277,39 +287,29 @@ function extractInPage() {
     }
   }
 
-  // --- Review count -----------------------------------------------------
-  // The button/span next to the rating typically reads "(348)" or "348 reviews"
-  const reviewButton = document.querySelector('button[aria-label*="reviews"]')
-                    || document.querySelector('button[jsaction*="reviewChart"]')
-                    || document.querySelector('div.F7nice button')
-                    || document.querySelector('div.F7nice span:nth-child(2)');
-  if (reviewButton) {
-    const t = reviewButton.getAttribute('aria-label') || reviewButton.textContent || '';
-    const m = t.match(/(\d{1,3}(?:[, ]\d{3})*|\d+)/);
-    if (m) {
-      const n = parseInt(m[1].replace(/[, ]/g, ''), 10);
-      if (n > 0 && n < 10_000_000) out.reviewCount = n;
+  // Review count — restrict the search to the rating header container so we
+  // don't match navigation, side-panel reviewer badges, or "(193) reviews"-style
+  // text elsewhere on the page.
+  const ratingHeader = document.querySelector('div.F7nice')
+    || (document.querySelector('[role="img"][aria-label*="stars"]') || {}).closest?.('div')
+    || null;
+  if (ratingHeader) {
+    // Look for any element whose accessible name/text mentions reviews.
+    const candidates = ratingHeader.querySelectorAll('button, span, a, div');
+    for (const el of candidates) {
+      const lbl = (el.getAttribute && el.getAttribute('aria-label')) || el.textContent || '';
+      if (!/review/i.test(lbl) && !/^\(?\d/.test(lbl.trim())) continue;
+      const m = lbl.match(/(\d{1,3}(?:[, ]\d{3})*|\d+)\s*(?:reviews?|Google\s+reviews?)/i)
+             || lbl.match(/\((\d{1,3}(?:[, ]\d{3})*|\d+)\)/);
+      if (m) {
+        const n = parseInt(m[1].replace(/[, ]/g, ''), 10);
+        if (n > 0 && n < 10_000_000) { out.reviewCount = n; break; }
+      }
     }
   }
 
-  // --- Distribution -----------------------------------------------------
-  // After clicking the rating, each star row has aria-label like
-  // "5 stars, 293 reviews" (or "1 star, 12 reviews" — singular).
-  const rows = Array.from(document.querySelectorAll('[aria-label]'))
-    .map(el => el.getAttribute('aria-label') || '')
-    .filter(l => /^\s*[1-5]\s+stars?,\s*\d/.test(l));
-  if (rows.length >= 5) {
-    const tmp = {};
-    for (const lbl of rows) {
-      const m = lbl.match(/^\s*([1-5])\s+stars?,\s*(\d{1,3}(?:[, ]\d{3})*|\d+)/);
-      if (m) tmp[parseInt(m[1], 10)] = parseInt(m[2].replace(/[, ]/g, ''), 10);
-    }
-    if (Object.keys(tmp).length === 5) {
-      out.dist = [tmp[1], tmp[2], tmp[3], tmp[4], tmp[5]];
-    }
-  }
-
-  // --- Last-ditch text fallback ----------------------------------------
+  // Last-ditch text fallback (parses the visible body text, picking the first
+  // "N reviews" mention — which is the place's total in the rating header).
   if (out.rating == null || out.reviewCount == null) {
     const txt = document.body.innerText.slice(0, 5000);
     if (out.rating == null) {
@@ -324,4 +324,41 @@ function extractInPage() {
   }
 
   return out;
+}
+
+/* Runs after the rating-breakdown overlay opens — collects the 1★–5★ counts. */
+function extractDistribution() {
+  const rows = Array.from(document.querySelectorAll('[aria-label]'))
+    .map(el => el.getAttribute('aria-label') || '')
+    .filter(l => /^\s*[1-5]\s+stars?,\s*\d/.test(l));
+  if (rows.length < 5) return null;
+  const tmp = {};
+  for (const lbl of rows) {
+    const m = lbl.match(/^\s*([1-5])\s+stars?,\s*(\d{1,3}(?:[, ]\d{3})*|\d+)/);
+    if (m) tmp[parseInt(m[1], 10)] = parseInt(m[2].replace(/[, ]/g, ''), 10);
+  }
+  if (Object.keys(tmp).length !== 5) return null;
+  return [tmp[1], tmp[2], tmp[3], tmp[4], tmp[5]];
+}
+
+/* Diagnostic snapshot of the DOM after all extraction phases ran, so we can
+ * see *why* a selector missed. Only returned when ?debug=1 is passed.
+ */
+function collectDebug() {
+  const buttonLabels = Array.from(document.querySelectorAll('button[aria-label]'))
+    .slice(0, 20)
+    .map(b => b.getAttribute('aria-label'));
+  const reviewItemCount = document.querySelectorAll('[data-review-id]').length;
+  const distRowCount = document.querySelectorAll('[aria-label*="stars,"]').length
+                     + document.querySelectorAll('[aria-label*=" star,"]').length;
+  return {
+    finalUrl: location.href,
+    title: document.title,
+    h1: (document.querySelector('h1') || {}).textContent || null,
+    bodyHead: document.body.innerText.slice(0, 600),
+    buttonLabels,
+    reviewItemCount,
+    distRowCount,
+    hasF7nice: !!document.querySelector('div.F7nice'),
+  };
 }
