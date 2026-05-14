@@ -69,13 +69,26 @@ After every commit that touches `worker.js`, `wrangler.toml`, or
    cd %USERPROFILE%\Downloads
    tar -xf reviews-main.zip
    cd reviews-main
+   npm install
    npx wrangler deploy
    ```
    Windows 10+ ships `tar` built in and it handles `.zip` natively, so
    we don't need a separate unzip tool. `tar -xf` extracts to the current
    directory, overwriting any previous extraction silently — the user can
    re-run this block every time without deleting the old folder first.
-   `npx` fetches wrangler on demand, no `npm install` needed.
+
+   **`npm install` is required**, not optional: wrangler bundles
+   `worker.js` and needs `@cloudflare/puppeteer` resolvable from
+   `node_modules`, otherwise the build fails with
+   `Could not resolve "@cloudflare/puppeteer"`. Since the user
+   re-extracts a fresh zip each time, `node_modules` may not persist,
+   so re-run `npm install` every redeploy.
+
+   On the very first deploy, `npx wrangler` will also prompt
+   `Ok to proceed? (y)` to install wrangler itself, and then open a
+   browser to log into Cloudflare. Tell the user to press `y` + Enter
+   at the prompt — multi-line paste at that point sends the next
+   command as the prompt answer and cancels the install.
 3. A reminder that until they run that block, the dashboard still hits
    the old Worker code.
 
