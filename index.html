@@ -193,6 +193,12 @@
   </section>
 
   <section>
+    <h2>Review submission timeline <span class="muted small" style="font-weight:normal; text-transform:none; letter-spacing:0">(your pharmacy — older months smoothed by Google's "X years ago" precision)</span></h2>
+    <svg class="chart" id="timeline-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+    <div class="legend" id="timeline-legend"></div>
+  </section>
+
+  <section>
     <h2>Star distribution</h2>
     <div class="grid two" id="distributions"></div>
   </section>
@@ -333,8 +339,17 @@ function addSnapshot(name, date, data) {
   const i = arr.findIndex(s => s.date === date);
   const entry = { date, rating: data.rating, reviewCount: data.reviewCount };
   if (data.dist) entry.dist = data.dist;
+  if (Array.isArray(data.reviews) && data.reviews.length) entry.reviews = data.reviews;
   if (i >= 0) arr[i] = entry; else arr.push(entry);
   arr.sort((a,b) => a.date < b.date ? -1 : 1);
+}
+function latestReviews(name) {
+  const arr = state.snapshots[name];
+  if (!arr) return null;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].reviews && arr[i].reviews.length) return arr[i].reviews;
+  }
+  return null;
 }
 function latest(name) {
   const arr = state.snapshots[name];
@@ -514,6 +529,7 @@ function render() {
   renderSnapshotForm();
   renderTable();
   renderHistory();
+  renderTimeline();
   renderDistributions();
   renderTargetSelect();
 }
@@ -670,6 +686,163 @@ function renderHistory() {
     k.innerHTML = `<span class="swatch" style="background:${color}"></span>${escapeHtml(s.name)}${s.home ? ' ★' : ''}`;
     legend.appendChild(k);
   });
+}
+
+/* ====================================================================
+   Review submission timeline (smoothed by uncertainty window).
+
+   Google Maps gives each review a relative date like "2 weeks ago" or
+   "a year ago". Older reviews are imprecise — "a year ago" could be
+   anywhere within ±6 months. We treat each review as a uniform
+   distribution over its precision window, then sum the overlaps into
+   monthly buckets so the chart shows a smooth shape rather than a
+   point spike on the imprecise dates.
+   ==================================================================== */
+
+function parseReviewAgo(ago, now = new Date()) {
+  if (!ago) return null;
+  const a = ago.trim().toLowerCase();
+  const day = 86400000;
+  const makeWindow = (daysAgo, windowDays) => {
+    const centerMs = now.getTime() - daysAgo * day;
+    return {
+      centerMs,
+      startMs: centerMs - (windowDays * day) / 2,
+      endMs:   centerMs + (windowDays * day) / 2,
+    };
+  };
+  if (/^(?:just now|moments?\s+ago|recently)$/.test(a)) return makeWindow(0, 1);
+  if (/^yesterday$/.test(a)) return makeWindow(1, 1);
+  // hours/minutes/seconds — recent today
+  if (/^(?:\d+|a|an)\s+(?:second|minute|hour)s?\s+ago$/.test(a)) return makeWindow(0, 1);
+  const m = a.match(/^(?:(\d+)|a|an)\s+(day|week|month|year)s?\s+ago$/);
+  if (!m) return null;
+  const n = m[1] ? parseInt(m[1], 10) : 1;
+  const unitDays = { day: 1, week: 7, month: 30.44, year: 365.25 }[m[2]];
+  return makeWindow(n * unitDays, unitDays);
+}
+
+function reviewsByMonth(reviews, monthsBack = 36) {
+  const now = new Date();
+  const buckets = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    buckets.push({
+      label: start.toLocaleString('en', { month: 'short', year: '2-digit' }),
+      startMs: start.getTime(),
+      endMs:   end.getTime(),
+      counts:  [0, 0, 0, 0, 0], // index = star - 1
+      total: 0,
+    });
+  }
+  for (const r of reviews) {
+    const w = parseReviewAgo(r.ago);
+    if (!w) continue;
+    const span = w.endMs - w.startMs;
+    if (span <= 0) continue;
+    const star = (r.stars >= 1 && r.stars <= 5) ? r.stars : null;
+    for (const b of buckets) {
+      const overlap = Math.min(w.endMs, b.endMs) - Math.max(w.startMs, b.startMs);
+      if (overlap <= 0) continue;
+      const frac = overlap / span;
+      b.total += frac;
+      if (star) b.counts[star - 1] += frac;
+    }
+  }
+  return buckets;
+}
+
+function renderTimeline() {
+  const svg = $('#timeline-chart');
+  const legend = $('#timeline-legend');
+  if (!svg) return;
+  svg.innerHTML = ''; legend.innerHTML = '';
+  const home = state.pharmacies.find(p => p.home) || state.pharmacies[0];
+  const reviews = home ? latestReviews(home.name) : null;
+
+  const W = 800, H = 220, padL = 36, padR = 12, padT = 12, padB = 36;
+  const ns = 'http://www.w3.org/2000/svg';
+  if (!reviews || !reviews.length) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates yet — refresh after deploying the updated Worker.</text>`;
+    return;
+  }
+
+  // Trim leading empty months so the chart starts at the oldest review.
+  let buckets = reviewsByMonth(reviews, 60);
+  const firstNonEmpty = buckets.findIndex(b => b.total > 0.005);
+  if (firstNonEmpty > 0) buckets = buckets.slice(Math.max(0, firstNonEmpty - 1));
+  if (!buckets.length) return;
+
+  const maxV = Math.max(0.5, ...buckets.map(b => b.total));
+  const xStep = (W - padL - padR) / buckets.length;
+  const xOf = i => padL + i * xStep;
+  const yOf = v => padT + (1 - v / maxV) * (H - padT - padB);
+
+  // Gridlines + y labels
+  for (let i = 0; i < 4; i++) {
+    const y = padT + i * (H - padT - padB) / 3;
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', padL); ln.setAttribute('x2', W - padR);
+    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+    ln.setAttribute('stroke', '#232b3a');
+    svg.appendChild(ln);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
+    const val = maxV - i * maxV / 3;
+    lbl.textContent = (val >= 10 ? Math.round(val) : val.toFixed(1));
+    svg.appendChild(lbl);
+  }
+
+  // X-axis labels — show ~6 evenly-spaced ticks.
+  const ticks = Math.min(6, buckets.length);
+  for (let i = 0; i < ticks; i++) {
+    const idx = Math.round(i * (buckets.length - 1) / Math.max(1, ticks - 1));
+    const t = document.createElementNS(ns, 'text');
+    t.setAttribute('x', xOf(idx) + xStep / 2); t.setAttribute('y', H - 18);
+    t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
+    t.setAttribute('text-anchor', 'middle');
+    t.textContent = buckets[idx].label;
+    svg.appendChild(t);
+  }
+
+  // Stacked bars by star rating: 5★ at the bottom, 1★ on top.
+  const starColor = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
+  buckets.forEach((b, i) => {
+    let yCursor = H - padB;
+    for (const star of [5, 4, 3, 2, 1]) {
+      const c = b.counts[star - 1];
+      if (c <= 0) continue;
+      const h = (c / maxV) * (H - padT - padB);
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', xOf(i) + 1);
+      rect.setAttribute('width', Math.max(0, xStep - 2));
+      rect.setAttribute('y', yCursor - h);
+      rect.setAttribute('height', h);
+      rect.setAttribute('fill', starColor[star]);
+      rect.setAttribute('opacity', '0.85');
+      const title = document.createElementNS(ns, 'title');
+      title.textContent = `${b.label}: ~${c.toFixed(1)} × ${star}★`;
+      rect.appendChild(title);
+      svg.appendChild(rect);
+      yCursor -= h;
+    }
+  });
+
+  // Legend
+  for (const star of [5, 4, 3, 2, 1]) {
+    const k = document.createElement('div');
+    k.className = 'key';
+    k.innerHTML = `<span class="swatch" style="background:${starColor[star]}"></span>${star}★`;
+    legend.appendChild(k);
+  }
+  const total = reviews.length;
+  const note = document.createElement('div');
+  note.className = 'key muted';
+  note.style.marginLeft = 'auto';
+  note.textContent = `Based on ${total} reviews — older months smoothed across the 'X years ago' window.`;
+  legend.appendChild(note);
 }
 
 function renderDistributions() {

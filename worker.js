@@ -107,7 +107,13 @@ export default {
         }, { timeout: 4000 }).catch(() => {});
       } catch (e) {}
 
+      // Scroll the reviews list and pull each review's relative date + stars
+      // so the dashboard can render a "when were reviews posted" timeline.
+      // Clicking the rating above already opens the reviews panel.
+      const reviews = await scrapeReviews(page).catch(() => []);
+
       const data = await page.evaluate(extractInPage);
+      data.reviews = reviews;
       return json(data);
     } catch (e) {
       return json({ error: String(e && e.message || e) }, 502);
@@ -142,6 +148,72 @@ async function isConsentPage(page) {
     // Localised titles seen in the wild for the "Before you continue" gate.
     return /^(Before you continue|Avant d.accéder|Antes de (?:acceder|continuar|ir)|Antes de (?:aceder|continuares)|Bevor du|Voordat je|Prima di (?:andare|accedere|continuare)|Innan du|Inden du|Ennen kuin|Zanim przejdziesz|Bevor Sie)/i
       .test(document.title || '');
+  });
+}
+
+async function scrapeReviews(page) {
+  // If the rating click didn't open the reviews panel (e.g. it failed), try
+  // clicking a "Reviews" tab as a fallback.
+  await page.evaluate(() => {
+    if (document.querySelector('[data-review-id]')) return;
+    const tabs = Array.from(document.querySelectorAll('button[role="tab"], div[role="tab"]'));
+    const reviewsTab = tabs.find(t => /^reviews$/i.test(((t.innerText || t.textContent || '').trim().split('\n')[0])));
+    if (reviewsTab && reviewsTab.getAttribute('aria-selected') !== 'true') {
+      (reviewsTab.closest('button') || reviewsTab).click();
+    }
+  });
+
+  await page.waitForSelector('[data-review-id]', { timeout: 8000 }).catch(() => {});
+
+  // Scroll the reviews list container until lazy-loading stops adding entries
+  // (or we hit the safety cap).
+  await page.evaluate(async () => {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const first = document.querySelector('[data-review-id]');
+    if (!first) return;
+    let scroller = first.parentElement;
+    while (scroller && scroller !== document.body) {
+      const cs = getComputedStyle(scroller);
+      if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll')
+          && scroller.scrollHeight > scroller.clientHeight + 4) break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller || scroller === document.body) return;
+
+    const HARD_CAP_REVIEWS = 1500;
+    const MAX_ITER = 250;
+    let lastCount = 0, stable = 0;
+    for (let i = 0; i < MAX_ITER && stable < 4; i++) {
+      scroller.scrollTop = scroller.scrollHeight;
+      await sleep(350);
+      const cur = document.querySelectorAll('[data-review-id]').length;
+      if (cur >= HARD_CAP_REVIEWS) break;
+      if (cur === lastCount) stable++;
+      else { stable = 0; lastCount = cur; }
+    }
+  });
+
+  return await page.evaluate(() => {
+    const out = [];
+    document.querySelectorAll('[data-review-id]').forEach(item => {
+      let stars = null;
+      const starEl = item.querySelector('[role="img"][aria-label*="star"], [aria-label$="stars"], [aria-label$=" star"]');
+      if (starEl) {
+        const m = (starEl.getAttribute('aria-label') || '').match(/(\d)\s+stars?/i);
+        if (m) stars = parseInt(m[1], 10);
+      }
+      let ago = null;
+      for (const s of item.querySelectorAll('span')) {
+        const t = (s.textContent || '').trim();
+        if (/^(?:(?:\d+|a|an)\s+(?:second|minute|hour|day|week|month|year)s?\s+ago|yesterday|just now|moments?\s+ago)$/i.test(t)) {
+          ago = t; break;
+        }
+        const m = t.match(/^edited\s+((?:\d+|a|an)\s+(?:second|minute|hour|day|week|month|year)s?\s+ago)$/i);
+        if (m) { ago = m[1]; break; }
+      }
+      if (ago && stars != null) out.push({ ago, stars });
+    });
+    return out;
   });
 }
 
