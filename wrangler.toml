@@ -1,0 +1,11 @@
+name = "pharm-scraper"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+browser = { binding = "BROWSER" }
+
+# Optional: lock down who can call this Worker by uncommenting and setting
+# a route for your domain. Without a route, the *.workers.dev URL is public
+# (which is fine since the Worker rejects non-google.com targets).
+# routes = [{ pattern = "scraper.yourdomain.com", custom_domain = true }]
