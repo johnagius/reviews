@@ -25,17 +25,25 @@ The Worker is yours, running in your Cloudflare account. The dashboard only talk
 
 ## Setup (one-time, ~3 minutes)
 
-### 1. Deploy the Worker
+### Option A — CLI (recommended)
 
-1. Sign in at <https://dash.cloudflare.com> → **Workers & Pages** → **Create application** → **Create Worker**. Give it a name (e.g. `pharm-scraper`) and deploy the Hello World stub.
-2. Open the new Worker → **Edit code** → paste the contents of [`worker.js`](worker.js) → **Save and deploy**.
-3. Back on the Worker overview → **Settings** → **Bindings** → **Add** → **Browser Rendering**. Set the variable name to `BROWSER` → save.
-4. Make sure your account is on the [Workers Paid plan](https://developers.cloudflare.com/workers/platform/pricing/) ($5/month). Browser Rendering is included; the free 10 min/day quota is plenty for a handful of pharmacies refreshed weekly.
-5. Copy the deployed URL (looks like `https://pharm-scraper.your-name.workers.dev`).
+```bash
+# In the cloned repo:
+npm install
+npx wrangler login        # opens browser, one-time
+npx wrangler deploy       # ships worker.js with the BROWSER binding
+```
 
-### 2. Point the dashboard at the Worker
+`wrangler deploy` prints the live URL (e.g. `https://pharm-scraper.<you>.workers.dev`). Paste it into the dashboard's yellow setup banner → **Save and refresh**.
 
-Open `index.html` (locally or wherever you've hosted it — GitHub Pages works). You'll see a yellow setup banner. Paste the Worker URL there, click **Save and refresh**, done. The dashboard auto-refreshes daily on first open.
+Your account needs to be on the [Workers Paid plan](https://developers.cloudflare.com/workers/platform/pricing/) ($5/month) for the Browser Rendering binding. The free 10 min/day Browser Rendering quota is plenty for a few pharmacies refreshed weekly.
+
+### Option B — Dashboard (no CLI)
+
+1. <https://dash.cloudflare.com> → **Workers & Pages** → **Create Worker**. Name it (e.g. `pharm-scraper`), deploy the stub.
+2. Open the Worker → **Edit code** → paste `worker.js` from this repo → **Save and deploy**.
+3. Worker → **Settings** → **Bindings** → **Add** → **Browser Rendering**, variable name `BROWSER`.
+4. Copy the deployed URL into the dashboard's setup banner.
 
 ## Adding more pharmacies
 
