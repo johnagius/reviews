@@ -16,9 +16,16 @@ fast-forward it into `main` and push `main`.
 ## Project
 
 Single-page dashboard (`index.html`) that compares the owner's pharmacy
-against competitors using public Google Maps data, fetched through a CORS
-proxy. State lives in `localStorage`. Optional Cloudflare Worker proxy in
-`proxy-worker.js`.
+against competitors using public Google Maps data, fetched through a
+Cloudflare Worker (`worker.js`) that runs headless Chromium. State lives
+in `localStorage`.
+
+The repo is intentionally just three live files:
+
+- `index.html` — the dashboard, served by GitHub Pages from `main`
+- `worker.js` — the Cloudflare Worker source (manually pasted into the
+  Cloudflare dashboard editor)
+- `README.md` + `CLAUDE.md` — docs
 
 Keep `index.html` self-contained — no build step, no external runtime deps.
 That's what makes it work as a GitHub Pages site with zero configuration.
@@ -30,8 +37,9 @@ GitHub's web UI / raw links, and paste into Cloudflare's dashboard editor.
 Don't suggest `git pull`, `wrangler deploy`, `npm install`, or any other
 CLI step — they won't run it.
 
-`wrangler.toml`, `package.json`, and `.gitignore` exist only for hypothetical
-CLI-based deploys and are not part of the user's flow. Leave them alone.
+Don't add `wrangler.toml`, `package.json`, `.gitignore`, or any other
+CLI/build scaffolding back to the repo. They were removed as dead weight
+because the user's flow is dashboard-paste only.
 
 ## After updating `worker.js`
 
