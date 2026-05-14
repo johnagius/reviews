@@ -41,6 +41,7 @@ export default {
 
     const target = new URL(request.url).searchParams.get('url');
     if (!target) return json({ error: 'pass ?url=<google-maps-place-url>' }, 400);
+    const wantDebug = new URL(request.url).searchParams.get('debug') === '1';
 
     let parsed;
     try { parsed = new URL(target); }
@@ -49,107 +50,118 @@ export default {
       return json({ error: `host not allowed: ${parsed.hostname}` }, 403);
     }
 
-    let browser;
-    try {
-      browser = await puppeteer.launch(env.BROWSER);
-      const page = await browser.newPage();
-      await page.setUserAgent(
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-        '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      );
-      await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
-      await page.setViewport({ width: 1280, height: 900 });
-
-      // Cloudflare's Browser Rendering egress is often EU-based, so Google
-      // serves its "Before you continue" consent interstitial before the
-      // Maps content. Pre-set the accept cookies so we skip the gate.
-      await page.setCookie(
-        { name: 'SOCS', value: 'CAESEwgDEgk0NzgwODA4MzMaAmVuIAEaBgiA_LyaBg',
-          domain: '.google.com', path: '/', secure: true, sameSite: 'Lax' },
-        { name: 'CONSENT', value: 'YES+cb', domain: '.google.com', path: '/' }
-      );
-
-      // Force English UI so our "N stars, M reviews" regexes match regardless
-      // of the IP-geolocated locale Google would otherwise pick.
-      const goUrl = withParam(target, 'hl', 'en');
-      await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-      // Fallback: if we still landed on consent.google.com (cookie didn't
-      // stick, or Google rolled the format), click whichever localised
-      // "Accept all" / "Reject all" button is on the page, then re-navigate
-      // to the target so we own the post-consent page state.
-      if (await isConsentPage(page)) {
-        await dismissConsent(page);
-        if (await isConsentPage(page)) {
-          await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        }
-      }
-
-      // Cloudflare's egress IP rotates per request, and on some IPs Google
-      // serves a "limited view" of Maps — no review count, no Reviews tab,
-      // stripped place card. Detect that and re-navigate with force=tt
-      // (and entry= stripped), which asks Maps for the full traditional
-      // place card.
-      if (await isLimitedView(page)) {
-        const u = new URL(goUrl);
-        u.searchParams.delete('entry');
-        u.searchParams.set('force', 'tt');
-        await page.goto(u.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
-      }
-
-      // Wait until the rating + a review count appear in body text. This is the
-      // signal that JS hydration is done.
-      await page.waitForFunction(() => {
-        const t = document.body.innerText;
-        return /(^|\s)[1-5]\.\d(\s|$)/m.test(t) && /\d+\s+(reviews?|Google reviews?)/i.test(t);
-      }, { timeout: 15000 }).catch(() => {});
-
-      // Phase 1: extract name + rating + reviewCount from the *initial* place
-      // card view — before any clicks. After we open the rating breakdown each
-      // visible reviewer card has its own "X reviews" badge, and a broad
-      // button[aria-label*="reviews"] selector then matches a reviewer's badge
-      // instead of the place's total, returning a tiny count like 4.
-      const basic = await page.evaluate(extractNameRatingCount);
-
-      // Phase 2: click the rating header to open the 1★–5★ breakdown overlay.
-      // Try the F7nice review-count button first (most reliable across UI
-      // refreshes), then fall back to the star icon's parent button.
-      try {
-        await page.evaluate(() => {
-          const f7Button = document.querySelector('div.F7nice button');
-          if (f7Button) { f7Button.click(); return; }
-          const reviewsBtn = document.querySelector('button[aria-label*="reviews"], button[aria-label*="Reviews"]');
-          if (reviewsBtn) { reviewsBtn.click(); return; }
-          const star = document.querySelector('[role="img"][aria-label*="stars"]')
-                    || document.querySelector('button[jsaction*="pane.rating.moreReviews"]');
-          if (star) (star.closest('button') || star).click();
-        });
-        await page.waitForFunction(() => {
-          return document.querySelectorAll('[aria-label*="stars,"]').length >= 5
-              || document.querySelectorAll('[aria-label*=" star,"]').length >= 5;
-        }, { timeout: 6000 }).catch(() => {});
-      } catch (e) {}
-
-      // Phase 3: extract dist while the breakdown overlay is open.
-      const dist = await page.evaluate(extractDistribution);
-
-      // Phase 4: scroll the reviews list and collect per-review dates/stars.
-      const reviews = await scrapeReviews(page).catch(() => []);
-
-      const debug = new URL(request.url).searchParams.get('debug') === '1'
-        ? await page.evaluate(collectDebug)
-        : undefined;
-
-      const data = { ...basic, dist, reviews };
-      if (debug) data._debug = debug;
-      return json(data);
-    } catch (e) {
-      return json({ error: String(e && e.message || e) }, 502);
-    } finally {
-      if (browser) await browser.close().catch(() => {});
+    // Cloudflare's Browser Rendering hands each new puppeteer.launch a fresh
+    // session, often from a different egress IP. Google flags some of those
+    // IPs and serves a "limited view" of Maps (no review count, no Reviews
+    // tab). Retry up to 3 times with fresh sessions when we detect that.
+    let attempts = [];
+    let last = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await scrapeOnce(env, target, wantDebug);
+      attempts.push({ attempt, limited: result.limited, reviewCount: result.data && result.data.reviewCount });
+      last = result;
+      if (!result.limited && result.data && result.data.reviewCount != null) break;
     }
+    if (last && last.data) {
+      if (wantDebug) last.data._attempts = attempts;
+      return json(last.data);
+    }
+    return json({ error: (last && last.error) || 'scrape failed', _attempts: attempts }, 502);
   }
 };
+
+async function scrapeOnce(env, target, wantDebug) {
+  let browser;
+  try {
+    browser = await puppeteer.launch(env.BROWSER);
+    const page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    );
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+    await page.setViewport({ width: 1280, height: 900 });
+
+    // Pre-set Google's consent-accept cookies on .google.com so we skip
+    // the "Before you continue" interstitial on EU-egress requests.
+    await page.setCookie(
+      { name: 'SOCS', value: 'CAESEwgDEgk0NzgwODA4MzMaAmVuIAEaBgiA_LyaBg',
+        domain: '.google.com', path: '/', secure: true, sameSite: 'Lax' },
+      { name: 'CONSENT', value: 'YES+cb', domain: '.google.com', path: '/' }
+    );
+
+    const goUrl = withParam(target, 'hl', 'en');
+    await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    if (await isConsentPage(page)) {
+      await dismissConsent(page);
+      if (await isConsentPage(page)) {
+        await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      }
+    }
+
+    // Wait for the page to settle into either limited or full view. The
+    // limited-view notice and the "N reviews" text both render
+    // asynchronously, so this single wait correctly handles both outcomes
+    // without racing the JS.
+    await page.waitForFunction(() => {
+      const t = document.body.innerText || '';
+      return /You'?re seeing a limited view of Google Maps/i.test(t)
+          || /\d+\s+(reviews?|Google\s+reviews?)/i.test(t)
+          || !!document.querySelector('div.F7nice button');
+    }, { timeout: 20000 }).catch(() => {});
+
+    // If we're on the limited view, try force=tt as a same-session escape;
+    // many places switch to the full place card with this toggle on. If it
+    // doesn't escape, the outer retry loop will reopen the browser with a
+    // new egress IP.
+    if (await isLimitedView(page)) {
+      const u = new URL(goUrl);
+      u.searchParams.delete('entry');
+      u.searchParams.set('force', 'tt');
+      await page.goto(u.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForFunction(() => {
+        const t = document.body.innerText || '';
+        return /You'?re seeing a limited view of Google Maps/i.test(t)
+            || /\d+\s+(reviews?|Google\s+reviews?)/i.test(t);
+      }, { timeout: 15000 }).catch(() => {});
+    }
+
+    const limited = await isLimitedView(page);
+
+    // Phase 1: extract name + rating + reviewCount from the initial place
+    // card view (before any click).
+    const basic = await page.evaluate(extractNameRatingCount);
+
+    // Phase 2: click the rating header to open the 1★–5★ breakdown overlay.
+    try {
+      await page.evaluate(() => {
+        const f7Button = document.querySelector('div.F7nice button');
+        if (f7Button) { f7Button.click(); return; }
+        const reviewsBtn = document.querySelector('button[aria-label*="reviews"], button[aria-label*="Reviews"]');
+        if (reviewsBtn) { reviewsBtn.click(); return; }
+        const star = document.querySelector('[role="img"][aria-label*="stars"]')
+                  || document.querySelector('button[jsaction*="pane.rating.moreReviews"]');
+        if (star) (star.closest('button') || star).click();
+      });
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('[aria-label*="stars,"]').length >= 5
+            || document.querySelectorAll('[aria-label*=" star,"]').length >= 5;
+      }, { timeout: 6000 }).catch(() => {});
+    } catch (e) {}
+
+    const dist = await page.evaluate(extractDistribution);
+    const reviews = await scrapeReviews(page).catch(() => []);
+
+    const data = { ...basic, dist, reviews };
+    if (wantDebug) data._debug = await page.evaluate(collectDebug);
+    return { data, limited, error: null };
+  } catch (e) {
+    return { data: null, limited: false, error: String(e && e.message || e) };
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
