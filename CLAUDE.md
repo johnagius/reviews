@@ -23,17 +23,33 @@ proxy. State lives in `localStorage`. Optional Cloudflare Worker proxy in
 Keep `index.html` self-contained — no build step, no external runtime deps.
 That's what makes it work as a GitHub Pages site with zero configuration.
 
+## User workflow
+
+The user **does not use git locally**. They view and download files from
+GitHub's web UI / raw links, and paste into Cloudflare's dashboard editor.
+Don't suggest `git pull`, `wrangler deploy`, `npm install`, or any other
+CLI step — they won't run it.
+
+`wrangler.toml`, `package.json`, and `.gitignore` exist only for hypothetical
+CLI-based deploys and are not part of the user's flow. Leave them alone.
+
 ## After updating `worker.js`
 
-GitHub Pages auto-deploys `index.html`, but the Cloudflare Worker doesn't
-auto-redeploy from this repo — the user has to push it. After every commit
-that touches `worker.js`, end the reply with:
+GitHub Pages auto-serves `index.html` from `main` within a minute of every
+push, so dashboard changes need no user action. The Cloudflare Worker is
+different — it does **not** auto-redeploy from this repo, so the user has
+to push it manually.
 
-1. The raw download link for the current `main`:
+After every commit that touches `worker.js`, end the reply with:
+
+1. The raw link for the file on `main`:
    `https://raw.githubusercontent.com/johnagius/reviews/main/worker.js`
-2. Both redeploy paths:
-   - **CLI:** `git pull && npx wrangler deploy`
-   - **Dashboard:** Cloudflare → Workers & Pages → `pharm-scraper` → Edit code → paste the raw file contents → Save and deploy.
+2. The dashboard redeploy steps:
+   - Cloudflare → Workers & Pages → `pharm-scraper` → Edit code
+   - Open the raw link above, select all, copy
+   - Paste over the editor contents → Save and deploy
+3. A reminder that until they redeploy, the dashboard still hits the old code.
 
-Don't skip this even if the change feels minor — until the Worker is
-redeployed, the dashboard still hits the old code.
+If a commit touches **only** `index.html` (or other files that aren't
+`worker.js`), say so explicitly and tell the user no Worker redeploy is
+needed — GitHub Pages handles it.
