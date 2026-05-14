@@ -55,13 +55,19 @@ After every commit that touches `worker.js`, `wrangler.toml`, or
 
 1. The zip download link for the current `main`:
    `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`
-2. The redeploy command (run in the unzipped folder):
+2. A complete copy-pasteable terminal block, assuming the zip lands in
+   `~/Downloads` (macOS default — adjust path if different):
    ```
+   cd ~/Downloads
+   unzip -o reviews-main.zip
+   cd reviews-main
    npx wrangler deploy
    ```
-   (first time only, run `npm install` first, or let `npx` fetch wrangler)
-3. A reminder that until they run that, the dashboard still hits the
-   old Worker code.
+   `unzip -o` overwrites a previous extraction without prompting, so the
+   user can re-run this block every time without first deleting the old
+   folder. `npx` fetches wrangler on demand, no `npm install` needed.
+3. A reminder that until they run that block, the dashboard still hits
+   the old Worker code.
 
 If a commit touches **only** `index.html` (or other files that aren't
 Worker-related), say so explicitly and tell the user no Worker redeploy
