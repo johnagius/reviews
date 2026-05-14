@@ -197,7 +197,7 @@ async function isConsentPage(page) {
   });
 }
 
-// Recognise relative-date strings Maps puts on individual review cards.
+// Relative-date strings Maps puts on individual review cards.
 const AGO_RE_SRC =
   '^(?:(?:\\d+|a|an)\\s+(?:second|minute|hour|day|week|month|year)s?\\s+ago|yesterday|just now|moments?\\s+ago)$';
 const EDITED_AGO_RE_SRC =
@@ -205,18 +205,13 @@ const EDITED_AGO_RE_SRC =
 
 async function scrapeReviews(page) {
   // After the rating click in phase 2, the breakdown overlay is open and the
-  // 1★–5★ rows are visible. Individual reviews sit in the SAME scrollable
-  // overlay just below the distribution, so we anchor scrolling on the dist
-  // row's nearest scrollable ancestor (we know it exists; data-review-id
-  // does not always).
-  await page.evaluate(async (agoSrc) => {
+  // 1★–5★ rows + individual reviews live in the same scrollable container.
+  // Anchor on a dist row (reliable — we just confirmed all 5 are present)
+  // and walk up to find the scrollable ancestor.
+  await page.evaluate(async () => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const agoRe = new RegExp(agoSrc, 'i');
-    const isReviewSpan = el => agoRe.test((el.textContent || '').trim());
-
     const anchor = document.querySelector('[aria-label*="stars, "], [aria-label*=" star, "]')
-                || document.querySelector('[data-review-id]')
-                || Array.from(document.querySelectorAll('span')).find(isReviewSpan);
+                || document.querySelector('[data-review-id]');
     if (!anchor) return;
     let scroller = anchor.parentElement;
     while (scroller && scroller !== document.body) {
@@ -228,59 +223,45 @@ async function scrapeReviews(page) {
     if (!scroller || scroller === document.body) {
       scroller = document.scrollingElement || document.documentElement;
     }
-    const countReviews = () => Array.from(document.querySelectorAll('span'))
-      .filter(isReviewSpan).length;
     const HARD_CAP = 1500, MAX_ITER = 300;
     let last = 0, stable = 0;
     for (let i = 0; i < MAX_ITER && stable < 4; i++) {
       scroller.scrollTop = scroller.scrollHeight;
       await sleep(350);
-      const cur = countReviews();
+      const cur = document.querySelectorAll('[data-review-id]').length;
       if (cur >= HARD_CAP) break;
       if (cur === last) stable++;
       else { stable = 0; last = cur; }
     }
-  }, AGO_RE_SRC);
+  });
 
+  // Extract each [data-review-id] card. For star detection accept several
+  // aria-label shapes ("5 stars", "5 stars,", "Rated 5.0 out of 5"). For
+  // the date, scan span text for any "X ago" / "Edited X ago" / "Yesterday".
   return await page.evaluate((agoSrc, editedSrc) => {
     const agoRe = new RegExp(agoSrc, 'i');
     const editedRe = new RegExp(editedSrc, 'i');
     const out = [];
-    const seen = new Set();
-    // Find every relative-date span on the page, then walk up to the
-    // nearest ancestor that also contains a star-rating element. That
-    // ancestor is the review card.
-    for (const span of document.querySelectorAll('span')) {
-      const txt = (span.textContent || '').trim();
+    document.querySelectorAll('[data-review-id]').forEach(item => {
+      let stars = null;
+      for (const el of item.querySelectorAll('[aria-label]')) {
+        const lbl = el.getAttribute('aria-label') || '';
+        // Skip aria-labels that mention "X reviews" — those are the place-
+        // level summary, not this card's star count.
+        if (/\d+\s+reviews?/i.test(lbl)) continue;
+        const m = lbl.match(/(?:^|\W)([1-5])\s+stars?(?:\W|$)/i)
+               || lbl.match(/Rated\s+([1-5])(?:\.\d)?\s+out of 5/i);
+        if (m) { stars = parseInt(m[1], 10); break; }
+      }
       let ago = null;
-      if (agoRe.test(txt)) ago = txt;
-      else {
-        const m = txt.match(editedRe);
-        if (m) ago = m[1];
+      for (const s of item.querySelectorAll('span')) {
+        const t = (s.textContent || '').trim();
+        if (agoRe.test(t)) { ago = t; break; }
+        const m = t.match(editedRe);
+        if (m) { ago = m[1]; break; }
       }
-      if (!ago) continue;
-
-      let p = span.parentElement, stars = null, card = null;
-      for (let i = 0; i < 10 && p; i++) {
-        const starEl = p.querySelector('[role="img"][aria-label*=" star"], [aria-label$=" stars"], [aria-label$=" star"]');
-        if (starEl) {
-          const lbl = starEl.getAttribute('aria-label') || '';
-          // Skip the place-level rating widget which mentions "X reviews"
-          // (we want individual review cards with a single star count).
-          if (/\d+\s+reviews?/i.test(lbl)) { p = p.parentElement; continue; }
-          const m = lbl.match(/^(\d)\s+stars?$/i)
-                 || lbl.match(/Rated\s+([1-5])(?:\.0)?\s+out of 5/i);
-          if (m) { stars = parseInt(m[1], 10); card = p; break; }
-        }
-        p = p.parentElement;
-      }
-      if (stars == null || !card) continue;
-      const key = (card.getAttribute && card.getAttribute('data-review-id'))
-               || (card.outerHTML || '').slice(0, 60);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ ago, stars });
-    }
+      if (ago && stars != null) out.push({ ago, stars });
+    });
     return out;
   }, AGO_RE_SRC, EDITED_AGO_RE_SRC);
 }
