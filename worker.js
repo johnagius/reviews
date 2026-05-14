@@ -85,6 +85,18 @@ export default {
         }
       }
 
+      // Cloudflare's egress IP rotates per request, and on some IPs Google
+      // serves a "limited view" of Maps — no review count, no Reviews tab,
+      // stripped place card. Detect that and re-navigate with force=tt
+      // (and entry= stripped), which asks Maps for the full traditional
+      // place card.
+      if (await isLimitedView(page)) {
+        const u = new URL(goUrl);
+        u.searchParams.delete('entry');
+        u.searchParams.set('force', 'tt');
+        await page.goto(u.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
+      }
+
       // Wait until the rating + a review count appear in body text. This is the
       // signal that JS hydration is done.
       await page.waitForFunction(() => {
@@ -154,6 +166,12 @@ function withParam(rawUrl, key, value) {
   } catch {
     return rawUrl;
   }
+}
+
+async function isLimitedView(page) {
+  return await page.evaluate(() =>
+    /You'?re seeing a limited view of Google Maps/i.test(document.body.innerText || '')
+  );
 }
 
 async function isConsentPage(page) {
@@ -398,5 +416,6 @@ function collectDebug() {
     f7ParentText: f7Parent ? (f7Parent.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400) : null,
     f7GrandParentText: f7GrandParent ? (f7GrandParent.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 600) : null,
     reviewLabels,
+    limited: /You'?re seeing a limited view of Google Maps/i.test(document.body.innerText || ''),
   };
 }

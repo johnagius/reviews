@@ -382,7 +382,7 @@ async function fetchOne(pharm) {
   if (!res.ok || !body || body.error) {
     throw new Error((body && body.error) || `HTTP ${res.status}`);
   }
-  if (body.rating == null || body.reviewCount == null) {
+  if (body.rating == null) {
     throw new Error('Scraper returned no rating');
   }
   return body;
