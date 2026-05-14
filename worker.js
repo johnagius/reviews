@@ -293,20 +293,39 @@ function extractNameRatingCount() {
     }
   }
 
-  // Review count — search the rating header text content. Typically it
-  // renders as "4.5(193)" or "4.5 (193) reviews"; we don't have to walk
-  // descendants because Google often splits the digits across sibling
-  // spans and only the joined text is reliable.
+  // Review count — Google has split it out of F7nice in the current UI for
+  // some places, so we search in widening scopes: F7nice itself, F7nice's
+  // parent (which contains both the rating and the count side-by-side),
+  // and finally any element on the page whose aria-label is the standard
+  // "Rated X out of 5 stars, N reviews" widget.
   const ratingHeader = document.querySelector('div.F7nice')
     || (document.querySelector('[role="img"][aria-label*="stars"]') || {}).closest?.('div')
     || null;
-  if (ratingHeader) {
-    const txt = (ratingHeader.textContent || '').replace(/\s+/g, ' ').trim();
+  const scopes = ratingHeader
+    ? [ratingHeader, ratingHeader.parentElement, ratingHeader.parentElement && ratingHeader.parentElement.parentElement]
+    : [];
+  for (const scope of scopes) {
+    if (!scope || out.reviewCount != null) break;
+    const txt = (scope.textContent || '').replace(/\s+/g, ' ').trim();
     const m = txt.match(/\((\d{1,3}(?:[, ]\d{3})*|\d+)\)/)
            || txt.match(/(\d{1,3}(?:[, ]\d{3})*|\d+)\s*(?:reviews?|Google\s+reviews?)/i);
     if (m) {
       const n = parseInt(m[1].replace(/[, ]/g, ''), 10);
       if (n > 0 && n < 10_000_000) out.reviewCount = n;
+    }
+  }
+  // Fallback: an aria-label of the form "Rated 4.5 out of 5 stars, 193 reviews"
+  // or just "193 reviews" — restricted to a value that round-trips through
+  // the place card so we don't catch reviewer cards or other navigation.
+  if (out.reviewCount == null) {
+    for (const el of document.querySelectorAll('[aria-label]')) {
+      const lbl = el.getAttribute('aria-label') || '';
+      let m = lbl.match(/Rated\s+[1-5][.,]\d.*?,\s*(\d{1,3}(?:[, ]\d{3})*|\d+)\s+reviews?/i);
+      if (!m) m = lbl.match(/^(\d{1,3}(?:[, ]\d{3})*|\d+)\s+(?:reviews?|Google\s+reviews?)$/i);
+      if (m) {
+        const n = parseInt(m[1].replace(/[, ]/g, ''), 10);
+        if (n > 0 && n < 10_000_000) { out.reviewCount = n; break; }
+      }
     }
   }
 
@@ -347,24 +366,37 @@ function extractDistribution() {
  * see *why* a selector missed. Only returned when ?debug=1 is passed.
  */
 function collectDebug() {
-  const buttonLabels = Array.from(document.querySelectorAll('button[aria-label]'))
-    .slice(0, 20)
-    .map(b => b.getAttribute('aria-label'));
-  const reviewItemCount = document.querySelectorAll('[data-review-id]').length;
-  const distRowCount = document.querySelectorAll('[aria-label*="stars,"]').length
-                     + document.querySelectorAll('[aria-label*=" star,"]').length;
   const f7 = document.querySelector('div.F7nice');
+  const f7Parent = f7 ? f7.parentElement : null;
+  const f7GrandParent = f7Parent ? f7Parent.parentElement : null;
+
+  // Any aria-label that mentions reviews with a digit, or matches the
+  // canonical "Rated X out of 5" pattern.
+  const reviewLabels = [];
+  for (const el of document.querySelectorAll('[aria-label]')) {
+    const lbl = el.getAttribute('aria-label') || '';
+    if (/\d+\s*(?:reviews?|Google\s+reviews?)/i.test(lbl) || /Rated\s+[1-5]/i.test(lbl)) {
+      reviewLabels.push(lbl.slice(0, 200));
+      if (reviewLabels.length >= 10) break;
+    }
+  }
+
   return {
     finalUrl: location.href,
     title: document.title,
     h1: (document.querySelector('h1') || {}).textContent || null,
-    bodyHead: document.body.innerText.slice(0, 600),
-    buttonLabels,
-    reviewItemCount,
-    distRowCount,
+    bodyHead: document.body.innerText.slice(0, 1500),
+    buttonLabels: Array.from(document.querySelectorAll('button[aria-label]')).slice(0, 30)
+      .map(b => b.getAttribute('aria-label')),
+    tabLabels: Array.from(document.querySelectorAll('[role="tab"]'))
+      .map(t => (t.innerText || t.textContent || '').trim()).filter(Boolean),
+    reviewItemCount: document.querySelectorAll('[data-review-id]').length,
+    distRowCount: document.querySelectorAll('[aria-label*="stars,"]').length
+                + document.querySelectorAll('[aria-label*=" star,"]').length,
     hasF7nice: !!f7,
     f7Text: f7 ? (f7.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200) : null,
-    f7Buttons: f7 ? Array.from(f7.querySelectorAll('button'))
-      .map(b => b.getAttribute('aria-label') || (b.textContent || '').trim()).slice(0, 5) : null,
+    f7ParentText: f7Parent ? (f7Parent.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400) : null,
+    f7GrandParentText: f7GrandParent ? (f7GrandParent.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 600) : null,
+    reviewLabels,
   };
 }
