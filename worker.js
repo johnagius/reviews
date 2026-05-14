@@ -223,97 +223,99 @@ const EDITED_AGO_RE_SRC =
 
 async function scrapeReviews(page, diag) {
   // After the rating click + Reviews-tab fallback, scroll the reviews
-  // container. Anchor first on [data-review-id] (the actual review
-  // cards — if they exist, scrolling THEIR container is the right
-  // thing). Fall back to scrolling the dist row's scroll ancestor if
-  // not. Last resort: scroll all scrollable elements on the page,
-  // since Maps' panel layout varies.
-  const scrapeInfo = await page.evaluate(async () => {
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const info = { anchor: null, scroller: null, iters: 0, finalCount: 0, scrollables: 0 };
-    let anchor = document.querySelector('[data-review-id]')
-              || document.querySelector('[aria-label*="stars, "], [aria-label*=" star, "]');
-    if (!anchor) {
-      info.anchor = 'none';
+  // container. Anchor first on [data-review-id]; fall back to dist row;
+  // last resort, scroll every visible scrollable container.
+  let scrapeInfo;
+  try {
+    scrapeInfo = await page.evaluate(async () => {
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const info = { anchor: null, scroller: null, iters: 0, finalCount: 0, scrollables: 0 };
+      let anchor = document.querySelector('[data-review-id]')
+                || document.querySelector('[aria-label*="stars, "], [aria-label*=" star, "]');
+      if (!anchor) {
+        info.anchor = 'none';
+        return info;
+      }
+      info.anchor = anchor.hasAttribute('data-review-id') ? 'review' : 'dist';
+
+      function findScrollable(start) {
+        let s = start && start.parentElement;
+        while (s && s !== document.body) {
+          const cs = getComputedStyle(s);
+          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll')
+              && s.scrollHeight > s.clientHeight + 4) return s;
+          s = s.parentElement;
+        }
+        return null;
+      }
+      let scroller = findScrollable(anchor);
+      if (!scroller) scroller = document.scrollingElement || document.documentElement;
+      const cls = typeof scroller.className === 'string' ? scroller.className : '';
+      info.scroller = `${scroller.tagName}.${cls.split(' ').slice(0,2).join('.')}` +
+                      `[h=${scroller.scrollHeight},vh=${scroller.clientHeight}]`;
+
+      const allScrollables = Array.from(document.querySelectorAll('*')).filter(el => {
+        const cs = getComputedStyle(el);
+        return (cs.overflowY === 'auto' || cs.overflowY === 'scroll')
+            && el.scrollHeight > el.clientHeight + 4;
+      });
+      info.scrollables = allScrollables.length;
+
+      const HARD_CAP = 1500, MAX_ITER = 300, WARMUP_ITERS = 25;
+      let last = 0, stable = 0;
+      for (let i = 0; i < MAX_ITER; i++) {
+        info.iters = i + 1;
+        scroller.scrollTop = scroller.scrollHeight;
+        for (const s of allScrollables) s.scrollTop = s.scrollHeight;
+        await sleep(400);
+        const cur = document.querySelectorAll('[data-review-id]').length;
+        info.finalCount = cur;
+        if (cur >= HARD_CAP) break;
+        if (cur === 0) {
+          if (i >= WARMUP_ITERS) break;
+          continue;
+        }
+        if (cur === last) stable++;
+        else { stable = 0; last = cur; }
+        if (stable >= 4) break;
+      }
       return info;
-    }
-    info.anchor = anchor.hasAttribute('data-review-id') ? 'review' : 'dist';
-
-    function findScrollable(start) {
-      let s = start && start.parentElement;
-      while (s && s !== document.body) {
-        const cs = getComputedStyle(s);
-        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll')
-            && s.scrollHeight > s.clientHeight + 4) return s;
-        s = s.parentElement;
-      }
-      return null;
-    }
-    let scroller = findScrollable(anchor);
-    if (!scroller) scroller = document.scrollingElement || document.documentElement;
-    info.scroller = `${scroller.tagName}.${(scroller.className || '').split(' ').slice(0,2).join('.')}` +
-                    `[h=${scroller.scrollHeight},vh=${scroller.clientHeight}]`;
-
-    // Also collect every visible scrollable container — we'll scroll them
-    // ALL each iteration. This is cheap and avoids picking the wrong one.
-    const allScrollables = Array.from(document.querySelectorAll('*')).filter(el => {
-      const cs = getComputedStyle(el);
-      return (cs.overflowY === 'auto' || cs.overflowY === 'scroll')
-          && el.scrollHeight > el.clientHeight + 4;
     });
-    info.scrollables = allScrollables.length;
+    if (diag) Object.assign(diag, scrapeInfo);
+  } catch (e) {
+    if (diag) diag.scrollError = String(e && (e.message || e)).slice(0, 300);
+    return [];
+  }
 
-    const HARD_CAP = 1500, MAX_ITER = 300, WARMUP_ITERS = 25;
-    let last = 0, stable = 0;
-    for (let i = 0; i < MAX_ITER; i++) {
-      info.iters = i + 1;
-      scroller.scrollTop = scroller.scrollHeight;
-      for (const s of allScrollables) s.scrollTop = s.scrollHeight;
-      await sleep(400);
-      const cur = document.querySelectorAll('[data-review-id]').length;
-      info.finalCount = cur;
-      if (cur >= HARD_CAP) break;
-      if (cur === 0) {
-        if (i >= WARMUP_ITERS) break;
-        continue;
-      }
-      if (cur === last) stable++;
-      else { stable = 0; last = cur; }
-      if (stable >= 4) break;
-    }
-    return info;
-  });
-  if (diag) Object.assign(diag, scrapeInfo);
-
-  // Extract each [data-review-id] card. For star detection accept several
-  // aria-label shapes ("5 stars", "5 stars,", "Rated 5.0 out of 5"). For
-  // the date, scan span text for any "X ago" / "Edited X ago" / "Yesterday".
-  return await page.evaluate((agoSrc, editedSrc) => {
-    const agoRe = new RegExp(agoSrc, 'i');
-    const editedRe = new RegExp(editedSrc, 'i');
-    const out = [];
-    document.querySelectorAll('[data-review-id]').forEach(item => {
-      let stars = null;
-      for (const el of item.querySelectorAll('[aria-label]')) {
-        const lbl = el.getAttribute('aria-label') || '';
-        // Skip aria-labels that mention "X reviews" — those are the place-
-        // level summary, not this card's star count.
-        if (/\d+\s+reviews?/i.test(lbl)) continue;
-        const m = lbl.match(/(?:^|\W)([1-5])\s+stars?(?:\W|$)/i)
-               || lbl.match(/Rated\s+([1-5])(?:\.\d)?\s+out of 5/i);
-        if (m) { stars = parseInt(m[1], 10); break; }
-      }
-      let ago = null;
-      for (const s of item.querySelectorAll('span')) {
-        const t = (s.textContent || '').trim();
-        if (agoRe.test(t)) { ago = t; break; }
-        const m = t.match(editedRe);
-        if (m) { ago = m[1]; break; }
-      }
-      if (ago && stars != null) out.push({ ago, stars });
-    });
-    return out;
-  }, AGO_RE_SRC, EDITED_AGO_RE_SRC);
+  try {
+    return await page.evaluate((agoSrc, editedSrc) => {
+      const agoRe = new RegExp(agoSrc, 'i');
+      const editedRe = new RegExp(editedSrc, 'i');
+      const out = [];
+      document.querySelectorAll('[data-review-id]').forEach(item => {
+        let stars = null;
+        for (const el of item.querySelectorAll('[aria-label]')) {
+          const lbl = el.getAttribute('aria-label') || '';
+          if (/\d+\s+reviews?/i.test(lbl)) continue;
+          const m = lbl.match(/(?:^|\W)([1-5])\s+stars?(?:\W|$)/i)
+                 || lbl.match(/Rated\s+([1-5])(?:\.\d)?\s+out of 5/i);
+          if (m) { stars = parseInt(m[1], 10); break; }
+        }
+        let ago = null;
+        for (const s of item.querySelectorAll('span')) {
+          const t = (s.textContent || '').trim();
+          if (agoRe.test(t)) { ago = t; break; }
+          const m = t.match(editedRe);
+          if (m) { ago = m[1]; break; }
+        }
+        if (ago && stars != null) out.push({ ago, stars });
+      });
+      return out;
+    }, AGO_RE_SRC, EDITED_AGO_RE_SRC);
+  } catch (e) {
+    if (diag) diag.extractError = String(e && (e.message || e)).slice(0, 300);
+    return [];
+  }
 }
 
 async function dismissConsent(page) {
