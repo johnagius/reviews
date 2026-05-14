@@ -32,16 +32,24 @@ That's what makes it work as a GitHub Pages site with zero configuration.
 
 ## User workflow
 
-The user **does not use git locally**. To redeploy the Worker they:
+The user is on **Windows** (`cmd.exe`, e.g. `C:\Users\Potte>` prompt) and
+**does not use git locally**. To redeploy the Worker they:
 
 1. Download the repo as a zip from GitHub's "Code → Download ZIP" button
    (URL: `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`)
-2. Unzip somewhere
+2. Extract it in their Downloads folder
 3. Run `npx wrangler deploy` in the unzipped folder
 
-So they DO use a terminal, just not git. Don't suggest `git pull` /
-`git clone` — they download fresh zips. Keep `wrangler.toml` and
-`package.json` intact; without them, `wrangler deploy` won't work.
+So they DO use a terminal, just not git, and the terminal is Windows
+`cmd.exe`. Don't suggest:
+
+- `git pull` / `git clone` — they download fresh zips
+- Unix-only syntax: `~/Downloads`, `unzip`, `&&` chains, single-quoted
+  strings — none of these work in `cmd.exe`
+- `bash` script blocks — give plain `cmd.exe` commands
+
+Keep `wrangler.toml` and `package.json` intact; without them,
+`wrangler deploy` won't work.
 
 ## After updating `worker.js`
 
@@ -55,17 +63,19 @@ After every commit that touches `worker.js`, `wrangler.toml`, or
 
 1. The zip download link for the current `main`:
    `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`
-2. A complete copy-pasteable terminal block, assuming the zip lands in
-   `~/Downloads` (macOS default — adjust path if different):
+2. A complete copy-pasteable Windows `cmd.exe` block, assuming the zip
+   lands in the default Downloads folder:
    ```
-   cd ~/Downloads
-   unzip -o reviews-main.zip
+   cd %USERPROFILE%\Downloads
+   tar -xf reviews-main.zip
    cd reviews-main
    npx wrangler deploy
    ```
-   `unzip -o` overwrites a previous extraction without prompting, so the
-   user can re-run this block every time without first deleting the old
-   folder. `npx` fetches wrangler on demand, no `npm install` needed.
+   Windows 10+ ships `tar` built in and it handles `.zip` natively, so
+   we don't need a separate unzip tool. `tar -xf` extracts to the current
+   directory, overwriting any previous extraction silently — the user can
+   re-run this block every time without deleting the old folder first.
+   `npx` fetches wrangler on demand, no `npm install` needed.
 3. A reminder that until they run that block, the dashboard still hits
    the old Worker code.
 
