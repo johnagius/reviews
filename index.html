@@ -380,23 +380,50 @@ function extract(html) {
 }
 
 /* ----------------------------- fetching -------------------------------- */
-function proxify(url) {
-  const tpl = state.proxy || 'https://corsproxy.io/?url={url}';
-  if (tpl.includes('{url}')) return tpl.replace('{url}', encodeURIComponent(url));
-  return tpl + encodeURIComponent(url);
+const PROXY_FALLBACKS = [
+  'https://corsproxy.io/?url={url}',
+  'https://api.allorigins.win/raw?url={url}',
+  'https://api.codetabs.com/v1/proxy?quest={url}',
+];
+
+function proxify(url, tpl) {
+  return tpl.includes('{url}') ? tpl.replace('{url}', encodeURIComponent(url)) : tpl + encodeURIComponent(url);
 }
 
+function hostOf(u) { return (u.match(/\/\/([^/]+)/) || [, 'proxy'])[1]; }
+
 async function fetchOne(pharm) {
-  const proxied = proxify(pharm.url);
-  const res = await fetch(proxied, { credentials: 'omit' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
-  if (state.debug) console.log('[debug]', pharm.name, html.length, 'chars', html.slice(0, 400));
-  const data = extract(html);
-  if (data.rating == null && data.reviewCount == null) {
-    throw new Error('Could not parse rating/reviews from response');
+  // Configured proxy first, then the fallbacks (deduped). If a proxy is
+  // rate-limited or returns junk, transparently try the next one.
+  const configured = state.proxy || PROXY_FALLBACKS[0];
+  const proxies = [configured, ...PROXY_FALLBACKS.filter(p => p !== configured)];
+
+  let lastErr;
+  for (const tpl of proxies) {
+    const host = hostOf(tpl);
+    try {
+      const res = await fetch(proxify(pharm.url, tpl), { credentials: 'omit' });
+      if (!res.ok) {
+        lastErr = new Error(`${host}: HTTP ${res.status}`);
+        // 429 / 5xx → upstream proxy is the problem; try the next one
+        if ([429, 502, 503, 504].includes(res.status)) continue;
+        throw lastErr;
+      }
+      const html = await res.text();
+      if (state.debug) console.log('[debug]', pharm.name, 'via', host, html.length, 'chars', html.slice(0, 300));
+      const data = extract(html);
+      if (data.rating == null && data.reviewCount == null) {
+        // Some proxies wrap responses or strip scripts — try another before giving up
+        lastErr = new Error(`${host}: could not parse rating/reviews`);
+        continue;
+      }
+      return data;
+    } catch (e) {
+      lastErr = e;
+      // Network / CORS / DNS — try the next proxy
+    }
   }
-  return data;
+  throw lastErr || new Error('All proxies failed');
 }
 
 async function refreshAll() {
