@@ -99,17 +99,23 @@ export default {
       // instead of the place's total, returning a tiny count like 4.
       const basic = await page.evaluate(extractNameRatingCount);
 
-      // Phase 2: click the rating to open the 1★–5★ distribution overlay.
+      // Phase 2: click the rating header to open the 1★–5★ breakdown overlay.
+      // Try the F7nice review-count button first (most reliable across UI
+      // refreshes), then fall back to the star icon's parent button.
       try {
         await page.evaluate(() => {
-          const btn = document.querySelector('[role="img"][aria-label*="stars"]')
-                  ||  document.querySelector('button[jsaction*="pane.rating.moreReviews"]');
-          if (btn) (btn.closest('button') || btn).click();
+          const f7Button = document.querySelector('div.F7nice button');
+          if (f7Button) { f7Button.click(); return; }
+          const reviewsBtn = document.querySelector('button[aria-label*="reviews"], button[aria-label*="Reviews"]');
+          if (reviewsBtn) { reviewsBtn.click(); return; }
+          const star = document.querySelector('[role="img"][aria-label*="stars"]')
+                    || document.querySelector('button[jsaction*="pane.rating.moreReviews"]');
+          if (star) (star.closest('button') || star).click();
         });
         await page.waitForFunction(() => {
           return document.querySelectorAll('[aria-label*="stars,"]').length >= 5
               || document.querySelectorAll('[aria-label*=" star,"]').length >= 5;
-        }, { timeout: 4000 }).catch(() => {});
+        }, { timeout: 6000 }).catch(() => {});
       } catch (e) {}
 
       // Phase 3: extract dist while the breakdown overlay is open.
@@ -287,24 +293,20 @@ function extractNameRatingCount() {
     }
   }
 
-  // Review count — restrict the search to the rating header container so we
-  // don't match navigation, side-panel reviewer badges, or "(193) reviews"-style
-  // text elsewhere on the page.
+  // Review count — search the rating header text content. Typically it
+  // renders as "4.5(193)" or "4.5 (193) reviews"; we don't have to walk
+  // descendants because Google often splits the digits across sibling
+  // spans and only the joined text is reliable.
   const ratingHeader = document.querySelector('div.F7nice')
     || (document.querySelector('[role="img"][aria-label*="stars"]') || {}).closest?.('div')
     || null;
   if (ratingHeader) {
-    // Look for any element whose accessible name/text mentions reviews.
-    const candidates = ratingHeader.querySelectorAll('button, span, a, div');
-    for (const el of candidates) {
-      const lbl = (el.getAttribute && el.getAttribute('aria-label')) || el.textContent || '';
-      if (!/review/i.test(lbl) && !/^\(?\d/.test(lbl.trim())) continue;
-      const m = lbl.match(/(\d{1,3}(?:[, ]\d{3})*|\d+)\s*(?:reviews?|Google\s+reviews?)/i)
-             || lbl.match(/\((\d{1,3}(?:[, ]\d{3})*|\d+)\)/);
-      if (m) {
-        const n = parseInt(m[1].replace(/[, ]/g, ''), 10);
-        if (n > 0 && n < 10_000_000) { out.reviewCount = n; break; }
-      }
+    const txt = (ratingHeader.textContent || '').replace(/\s+/g, ' ').trim();
+    const m = txt.match(/\((\d{1,3}(?:[, ]\d{3})*|\d+)\)/)
+           || txt.match(/(\d{1,3}(?:[, ]\d{3})*|\d+)\s*(?:reviews?|Google\s+reviews?)/i);
+    if (m) {
+      const n = parseInt(m[1].replace(/[, ]/g, ''), 10);
+      if (n > 0 && n < 10_000_000) out.reviewCount = n;
     }
   }
 
@@ -351,6 +353,7 @@ function collectDebug() {
   const reviewItemCount = document.querySelectorAll('[data-review-id]').length;
   const distRowCount = document.querySelectorAll('[aria-label*="stars,"]').length
                      + document.querySelectorAll('[aria-label*=" star,"]').length;
+  const f7 = document.querySelector('div.F7nice');
   return {
     finalUrl: location.href,
     title: document.title,
@@ -359,6 +362,9 @@ function collectDebug() {
     buttonLabels,
     reviewItemCount,
     distRowCount,
-    hasF7nice: !!document.querySelector('div.F7nice'),
+    hasF7nice: !!f7,
+    f7Text: f7 ? (f7.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200) : null,
+    f7Buttons: f7 ? Array.from(f7.querySelectorAll('button'))
+      .map(b => b.getAttribute('aria-label') || (b.textContent || '').trim()).slice(0, 5) : null,
   };
 }
