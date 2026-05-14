@@ -376,7 +376,7 @@ function scraperEndpoint(targetUrl) {
 async function fetchOne(pharm) {
   const endpoint = scraperEndpoint(pharm.url);
   if (!endpoint) throw new Error('Scraper URL not set');
-  const res = await fetch(endpoint, { credentials: 'omit' });
+  const res = await fetch(endpoint, { credentials: 'omit', cache: 'no-store' });
   let body;
   try { body = await res.json(); } catch { body = null; }
   if (!res.ok || !body || body.error) {
@@ -433,7 +433,7 @@ async function testScraper() {
   $('#scraper-test-result').textContent = 'Testing…';
   try {
     const endpoint = url.replace(/\/+$/, '') + '/?url=' + encodeURIComponent(sample);
-    const res = await fetch(endpoint, { credentials: 'omit' });
+    const res = await fetch(endpoint, { credentials: 'omit', cache: 'no-store' });
     const body = await res.json();
     if (!res.ok || body.error) {
       $('#scraper-test-result').innerHTML = `<span class="err">Failed: ${escapeHtml(body.error || ('HTTP ' + res.status))}</span>`;

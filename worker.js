@@ -33,6 +33,11 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Max-Age': '86400',
+  // Without this, the browser can heuristically cache the JSON response for
+  // a while. That bit us once: a 3-review response from an early broken
+  // deploy kept being served back to the dashboard even after the Worker
+  // started returning 193 reviews.
+  'Cache-Control': 'no-store',
 };
 
 export default {
