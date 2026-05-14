@@ -63,19 +63,23 @@ After every commit that touches `worker.js`, `wrangler.toml`, or
 
 1. The zip download link for the current `main`:
    `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`
-2. A complete copy-pasteable Windows `cmd.exe` block, assuming the zip
-   lands in the default Downloads folder:
+2. A complete copy-pasteable Windows `cmd.exe` block. Always
+   `curl`-download the zip fresh rather than telling them to click the
+   GitHub link — browsers will serve a stale cached zip and silently
+   redeploy the previous code, which has burned us before:
    ```
    cd %USERPROFILE%\Downloads
+   del reviews-main.zip
+   rmdir /S /Q reviews-main
+   curl -L -o reviews-main.zip https://github.com/johnagius/reviews/archive/refs/heads/main.zip
    tar -xf reviews-main.zip
    cd reviews-main
    npm install
    npx wrangler deploy
    ```
-   Windows 10+ ships `tar` built in and it handles `.zip` natively, so
-   we don't need a separate unzip tool. `tar -xf` extracts to the current
-   directory, overwriting any previous extraction silently — the user can
-   re-run this block every time without deleting the old folder first.
+   Windows 10+ ships `curl` and `tar` built in. `del`/`rmdir` print
+   "could not find" the first time, which is harmless. `curl -L`
+   follows GitHub's 302 to codeload.github.com.
 
    **`npm install` is required**, not optional: wrangler bundles
    `worker.js` and needs `@cloudflare/puppeteer` resolvable from
