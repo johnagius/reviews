@@ -1,49 +1,80 @@
 # Pharmacy Review Tracker
 
-A single-file dashboard that tracks your pharmacy's Google rating + review count against competitors over time, and tells you exactly how many more 5★ reviews you need to hit a target. Runs from `index.html` — no server, no account, no API key.
+Single-page dashboard that auto-tracks your pharmacy's Google rating + review count + 1★–5★ distribution against competitors over time, and tells you exactly how many more 5★ reviews you need to hit a target rating.
 
-## Quick start
+Refresh is fully automated — click one button, the dashboard scrapes every Maps page invisibly via a Cloudflare Worker running real headless Chromium, returns clean JSON, and updates. No copy/paste, no opening tabs.
 
-1. Open `index.html` (or visit the GitHub Pages URL it's hosted at).
-2. Hit **Settings** → paste your pharmacies (one per line). Prefix your own with `*`:
+## How it works
 
-   ```
-   * Potter's Pharmacy St. Julian's | https://www.google.com/maps/place/Potter's+Pharmacy...
-   Competitor A                    | https://www.google.com/maps/place/Competitor+A...
-   Competitor B                    | https://www.google.com/maps/place/Competitor+B...
-   ```
+```
+index.html (browser, localStorage)
+       │
+       └──fetch──▶  your Cloudflare Worker  ──▶  headless Chromium
+                          │                          │
+                          │                          ▼
+                          │                    Google Maps place page
+                          │                  (JS hydrates, DOM populates)
+                          ▼                          │
+                    DOM extraction  ◀────────────────┘
+                          │
+                          ▼
+            JSON: { rating, reviewCount, dist }
+```
 
-3. Click **Open all in Maps** — tabs open for every pharmacy.
-4. Glance at each Maps panel (rating + total review count). Back in the dashboard, type those numbers into the form rows (one per pharmacy). Optionally paste the 1★/2★/3★/4★/5★ counts too (Maps shows them when you click the rating).
-5. Click **Save snapshot**. The dashboard updates: overview, comparison table, history chart, distributions, target calculator.
+The Worker is yours, running in your Cloudflare account. The dashboard only talks to your Worker. Nothing else leaves your browser.
 
-Repeat weekly (or whenever you want a data point). Two snapshots in, you get 7-day deltas. Several snapshots in, the history chart fills out and the target calculator estimates how long your campaign will take.
+## Setup (one-time, ~3 minutes)
 
-Whole loop is under a minute once it's set up.
+### 1. Deploy the Worker
+
+1. Sign in at <https://dash.cloudflare.com> → **Workers & Pages** → **Create application** → **Create Worker**. Give it a name (e.g. `pharm-scraper`) and deploy the Hello World stub.
+2. Open the new Worker → **Edit code** → paste the contents of [`worker.js`](worker.js) → **Save and deploy**.
+3. Back on the Worker overview → **Settings** → **Bindings** → **Add** → **Browser Rendering**. Set the variable name to `BROWSER` → save.
+4. Make sure your account is on the [Workers Paid plan](https://developers.cloudflare.com/workers/platform/pricing/) ($5/month). Browser Rendering is included; the free 10 min/day quota is plenty for a handful of pharmacies refreshed weekly.
+5. Copy the deployed URL (looks like `https://pharm-scraper.your-name.workers.dev`).
+
+### 2. Point the dashboard at the Worker
+
+Open `index.html` (locally or wherever you've hosted it — GitHub Pages works). You'll see a yellow setup banner. Paste the Worker URL there, click **Save and refresh**, done. The dashboard auto-refreshes daily on first open.
+
+## Adding more pharmacies
+
+**Settings** → paste one pharmacy per line, format `name | google-maps-url`. Prefix your own with `*`:
+
+```
+* Potter's Pharmacy St. Julian's | https://www.google.com/maps/place/...
+Competitor A                    | https://www.google.com/maps/place/...
+Competitor B                    | https://www.google.com/maps/place/...
+```
+
+Save. Click **Refresh all**.
 
 ## What you get
 
-- **Overview**: your rating, total reviews, rank vs competitors, 7-day deltas — visible the moment you save a snapshot.
-- **Snapshot form**: pre-filled with last entries, so most weeks it's just bumping a couple of numbers.
+- **Overview** cards: your rating, total reviews, rank by rating, rank by reviews — all with 7-day deltas.
 - **Comparison table**: sortable, with Δ reviews / Δ rating since 7 days ago.
 - **History chart**: review-count timeline per pharmacy, your pharmacy highlighted gold.
-- **Star distribution**: 1★–5★ bars per pharmacy (when you enter them).
+- **Star distribution**: 1★–5★ bars per pharmacy (extracted automatically when the Worker can open the rating panel).
 - **Target calculator**: "to go from 4.7 → 4.8, you need N more 5★ reviews; at your current pace, that's ~M weeks."
-- **Bulk paste** (under Settings): paste all rows at once instead of editing per-row.
-- **CSV + JSON export** so the data is yours.
+- **CSV + JSON export**, **JSON import** for migrating between browsers.
 
-## Why no auto-scraping
+## Local dev for the Worker (optional)
 
-I tried. Google Maps doesn't include rating/review data in the HTML you get from `fetch()` — the data is loaded by JavaScript after the page hydrates. Even routed through CORS proxies, the response is just the JS app shell with the place name and coordinates, no rating. Public proxies that used to work (`corsproxy.io`) have moved to paid plans; the rest either rate-limit or get served the same useless shell because Google geo-routes from datacenter IPs.
+If you want to iterate on the Worker locally:
 
-The only ways to actually automate this are:
-- Paid APIs (Google Place Details, SerpApi) — works but costs money
-- Headless-browser scraping (Puppeteer/Playwright) — needs a server, not a local HTML file
-- The Business Profile API — your own pharmacy only, and requires verification
+```bash
+npm install -g wrangler
+npm install @cloudflare/puppeteer
+wrangler login
+wrangler dev      # local preview at http://localhost:8787
+wrangler deploy   # ship to production
+```
 
-For a free, local, weekly-ish workflow, manual entry beats all of them. Reading four numbers off a Maps tab takes ten seconds; the dashboard does the analytics.
+The bundled `wrangler.toml` already wires the `BROWSER` binding.
 
 ## Notes
 
-- All data lives in `localStorage`. Nothing leaves your browser. Export JSON if you switch devices or browsers.
-- Google's terms allow asking real customers for honest reviews; they don't allow incentives or "5-star only" solicitation. A sudden burst of new-account 5★s is exactly what their spam filter looks for — keep the campaign clean.
+- All snapshots and the pharmacy list live in `localStorage`. Export JSON if you switch devices.
+- The Worker is host-locked to google.com so nobody else can use it as an open scraper.
+- Google's terms allow asking real customers for honest reviews; they don't allow incentives or "5-star only" solicitation. A sudden burst of new-account 5★s is exactly what their spam filter looks for.
+- If you don't want to pay for Workers Paid: open **Settings** → **Manual entry** to type ratings in by hand. The rest of the dashboard (history, comparison, target calc) works either way.

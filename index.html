@@ -32,13 +32,15 @@
     padding: 14px 16px; margin-bottom: 16px; }
   button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
-  button:hover { border-color: var(--accent); }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
   button.primary { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
-  button.primary:hover { filter: brightness(1.1); }
+  button.primary:hover:not(:disabled) { filter: brightness(1.1); }
   button.danger { color: var(--bad); }
   input, textarea, select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
-    border-radius: 6px; padding: 6px 9px; font: inherit; }
-  textarea { width: 100%; min-height: 80px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+    border-radius: 6px; padding: 8px 10px; font: inherit; }
+  textarea { width: 100%; min-height: 90px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,140,255,.15); }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px;
@@ -55,10 +57,9 @@
   .pill.warn { color: var(--warn); border-color: var(--warn); }
   .stars { color: var(--warn); letter-spacing: 1px; }
   .grid { display: grid; gap: 12px; }
-  .grid.two { grid-template-columns: 1fr 1fr; }
-  .grid.three { grid-template-columns: 1fr 1fr 1fr; }
-  .grid.four { grid-template-columns: repeat(4, 1fr); }
-  @media (max-width: 900px) { .grid.two, .grid.three, .grid.four { grid-template-columns: 1fr; } }
+  .grid.two   { grid-template-columns: 1fr 1fr; }
+  .grid.four  { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) { .grid.two, .grid.four { grid-template-columns: 1fr; } }
   .stat { background: var(--panel-2); border-radius: 8px; padding: 12px 14px; }
   .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
   .stat .value { font-size: 24px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
@@ -76,29 +77,43 @@
   .bar-bg .bar { position: absolute; left: 0; top: 0; }
   .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel); border: 1px solid var(--line);
     color: var(--text); padding: 10px 14px; border-radius: 8px; max-width: 360px;
-    box-shadow: 0 8px 24px rgba(0,0,0,.4); }
-  .err { color: var(--bad); }
+    box-shadow: 0 8px 24px rgba(0,0,0,.4); font-size: 13px; }
+  .toast.good { border-color: var(--good); }
+  .toast.err  { border-color: var(--bad); color: var(--bad); }
   svg.chart { width: 100%; height: 220px; }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
   .legend .key { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .legend .swatch { width: 12px; height: 4px; border-radius: 2px; }
-  .star-row { display: grid; grid-template-columns: 28px 1fr 80px; gap: 8px; align-items: center;
+  .star-row { display: grid; grid-template-columns: 28px 1fr 90px; gap: 8px; align-items: center;
     margin-bottom: 4px; font-size: 12px; }
   .star-row .bar-bg { width: 100%; }
   .target-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
   .target-row label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
   .footer-note { color: var(--muted); font-size: 11.5px; padding: 12px 0 0; }
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  .setup { border: 1px solid rgba(245,166,35,.45); background: rgba(245,166,35,.08); }
+  .setup h2 { color: var(--warn); }
+  .setup code, .setup pre {
+    background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 6px;
+    display: inline-block; padding: 2px 6px; }
+  .setup pre { display: block; padding: 10px 12px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  .setup ol { margin: 10px 0 12px 18px; padding: 0; }
+  .setup ol li { margin: 6px 0; }
+  .pulse {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); margin-right: 6px;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
-  /* Snapshot entry form */
+  /* Manual form, hidden under Settings */
   .snap-row { display: grid;
     grid-template-columns: minmax(180px, 2.2fr) 80px 95px minmax(160px, 1.6fr) 80px;
     gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
   .snap-row:last-child { border-bottom: none; }
+  .snap-row input { width: 100%; padding: 6px 9px; }
   .snap-row .snap-name { font-weight: 600; }
   .snap-row a.snap-open { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 11.5px; text-decoration: none; }
-  .snap-row a.snap-open:hover { color: var(--accent); }
-  .snap-row input { width: 100%; }
   .snap-row .snap-last { color: var(--muted); font-size: 11px; text-align: right; }
   .snap-header { display: grid;
     grid-template-columns: minmax(180px, 2.2fr) 80px 95px minmax(160px, 1.6fr) 80px;
@@ -112,40 +127,45 @@
   <h1>Pharmacy Review Tracker</h1>
   <span class="muted small" id="last-refresh">No snapshots yet</span>
   <div class="grow"></div>
-  <button id="btn-snap-jump" class="primary">Add snapshot</button>
-  <button id="btn-open-all">Open all in Maps</button>
+  <button id="btn-refresh" class="primary">Refresh all</button>
   <button id="btn-export">Export CSV</button>
   <button id="btn-config">Settings</button>
 </header>
 
 <main>
 
+  <section id="setup-banner" class="setup" style="display:none">
+    <h2>One-time setup: deploy the scraper Worker</h2>
+    <p class="small" style="margin-top:0">
+      The dashboard needs a tiny Cloudflare Worker that renders each Maps page in a real headless browser (so the rating + reviews actually appear in the DOM) and returns clean JSON. Once it's deployed, "Refresh all" updates every pharmacy invisibly — no copy/paste, no manual entry.
+    </p>
+    <ol class="small">
+      <li>Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com</a> → Workers & Pages → Create application → Create Worker. Pick a name (e.g. <code>pharm-scraper</code>) and deploy the Hello World stub.</li>
+      <li>Click your new Worker → <b>Edit code</b> → replace the contents with <code>worker.js</code> from this repo → <b>Save and deploy</b>.</li>
+      <li>Back on the Worker overview: <b>Settings</b> → <b>Bindings</b> → <b>Add</b> → <b>Browser Rendering</b>. Set the variable name to <code>BROWSER</code> → Save.</li>
+      <li>Make sure your account is on the <a href="https://developers.cloudflare.com/workers/platform/pricing/" target="_blank" rel="noopener">Workers Paid plan</a> ($5/month). Browser Rendering's free quota (10 min/day) is plenty for a few pharmacies refreshed weekly.</li>
+      <li>Copy the deployed Worker URL (looks like <code>https://pharm-scraper.your-name.workers.dev</code>) and paste it below.</li>
+    </ol>
+    <div class="row" style="margin-top:6px">
+      <input id="setup-url" placeholder="https://pharm-scraper.<you>.workers.dev" style="flex:1; min-width: 320px">
+      <button class="primary" id="btn-setup-save">Save and refresh</button>
+    </div>
+  </section>
+
+  <section id="status-section" style="display:none">
+    <div class="row">
+      <span class="pulse"></span>
+      <span id="status-text">Refreshing…</span>
+    </div>
+  </section>
+
   <section id="overview-section">
     <h2>Your pharmacy vs competitors</h2>
-    <div class="grid four" id="overview-stats">
+    <div class="grid four">
       <div class="stat"><div class="label">Your rating</div><div class="value" id="o-rating">—</div><div class="delta" id="o-rating-delta">No snapshots yet</div></div>
       <div class="stat"><div class="label">Your reviews</div><div class="value" id="o-reviews">—</div><div class="delta" id="o-reviews-delta">No snapshots yet</div></div>
       <div class="stat"><div class="label">Rank by rating</div><div class="value" id="o-rank-rating">—</div><div class="delta" id="o-rank-rating-note"></div></div>
       <div class="stat"><div class="label">Rank by reviews</div><div class="value" id="o-rank-reviews">—</div><div class="delta" id="o-rank-reviews-note"></div></div>
-    </div>
-  </section>
-
-  <section id="snapshot-section">
-    <h2>Add today's snapshot <span class="muted small" id="snapshot-date" style="text-transform:none;letter-spacing:0;margin-left:6px"></span></h2>
-    <div class="muted small" style="margin-bottom:10px">
-      Open each pharmacy on Google Maps (the link is on every row), read the rating + total review count off the page, type them in here, then <b>Save</b>. Pre-filled with your last entries so it's just a quick edit.
-    </div>
-    <div class="snap-header">
-      <div>Pharmacy</div>
-      <div>Rating</div>
-      <div>Reviews</div>
-      <div>★ Distribution (optional)</div>
-      <div style="text-align:right">Last</div>
-    </div>
-    <div id="snapshot-form"></div>
-    <div class="row" style="margin-top:12px">
-      <button id="btn-save-snapshot" class="primary">Save snapshot</button>
-      <span class="muted small" id="snap-hint">Saves all rows as one snapshot dated today. You can run this once per week or as often as you like.</span>
     </div>
   </section>
 
@@ -170,17 +190,11 @@
     <h2>Review count history</h2>
     <svg class="chart" id="history-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
     <div class="legend" id="history-legend"></div>
-    <div class="muted small" style="margin-top:8px">
-      History grows as you add snapshots. Each save stores one point per pharmacy per day.
-    </div>
   </section>
 
   <section>
     <h2>Star distribution</h2>
     <div class="grid two" id="distributions"></div>
-    <div class="muted small" style="margin-top:8px">
-      Optional. If you fill the distribution column when adding a snapshot (e.g. <code>12,4,8,31,293</code> for 1★/2★/3★/4★/5★ counts), the bars below render.
-    </div>
   </section>
 
   <section>
@@ -204,19 +218,31 @@
     <h2>Settings</h2>
 
     <details open>
-      <summary>Pharmacies (one per line, format: <code>name | google-maps-url</code>, prefix with <code>*</code> for your pharmacy)</summary>
+      <summary>Pharmacies (one per line: <code>name | google-maps-url</code>; prefix with <code>*</code> for your pharmacy)</summary>
       <textarea id="pharmacies"></textarea>
-      <div class="row small muted" style="margin-top:6px">
-        Open the pharmacy on Google Maps, copy the URL from the address bar, paste it here. The form above uses this list.
-      </div>
     </details>
 
     <details>
-      <summary>Bulk paste (one line per pharmacy: <code>name | rating | reviewCount | s1,s2,s3,s4,s5</code>)</summary>
-      <textarea id="bulk-data" placeholder='Potter&#39;s Pharmacy St. Julian&#39;s | 4.7 | 348 | 12,4,8,31,293'></textarea>
+      <summary>Scraper URL (Cloudflare Worker)</summary>
       <div class="row" style="margin-top:6px">
-        <button id="btn-bulk">Save these as today's snapshot</button>
-        <span class="small muted">Alternative to the per-row form if you'd rather paste everything at once.</span>
+        <input id="scraper-url" placeholder="https://pharm-scraper.<you>.workers.dev" style="flex:1; min-width: 320px">
+        <button id="btn-test-scraper">Test</button>
+      </div>
+      <div id="scraper-test-result" class="small muted" style="margin-top:6px"></div>
+    </details>
+
+    <details>
+      <summary>Manual entry (fallback if you don't want to deploy the Worker)</summary>
+      <div class="snap-header">
+        <div>Pharmacy</div>
+        <div>Rating</div>
+        <div>Reviews</div>
+        <div>★ Distribution (optional)</div>
+        <div style="text-align:right">Last</div>
+      </div>
+      <div id="snapshot-form"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="btn-save-snapshot">Save manual snapshot</button>
       </div>
     </details>
 
@@ -237,7 +263,7 @@
   </section>
 
   <div class="footer-note">
-    Everything stays on your machine — pharmacy list and snapshots live in <code>localStorage</code>. No server, no account, no API key. Auto-scraping Google Maps from a local page isn't a viable option (their HTML doesn't include rating data, and proxy services that fetched it are either rate-limited or have moved to paid plans) — but reading off four numbers a week and typing them in takes less than a minute, and the dashboard does the analytics.
+    Pharmacy list and snapshots live in <code>localStorage</code>. Only the scraper Worker — running in your own Cloudflare account — talks to Google. Nothing else leaves the browser.
   </div>
 </main>
 
@@ -245,7 +271,7 @@
 
 <script>
 /* =========================================================================
-   Pharmacy Review Tracker — manual-entry dashboard
+   Pharmacy Review Tracker — auto-refresh via Cloudflare scraper Worker
    ------------------------------------------------------------------------- */
 
 const DEFAULT_PHARMACIES = [
@@ -260,23 +286,20 @@ const state = load();
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
-    // One-time migration from v1 (the old auto-scrape version)
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (typeof s.scraperUrl !== 'string') s.scraperUrl = '';
+      return s;
+    }
     const v1 = localStorage.getItem('pharmRev.v1');
     if (v1) {
       const old = JSON.parse(v1);
-      return {
-        pharmacies: old.pharmacies || DEFAULT_PHARMACIES.slice(),
-        snapshots: old.snapshots || {},
-        lastRefresh: old.lastRefresh || null,
-      };
+      return { pharmacies: old.pharmacies || DEFAULT_PHARMACIES.slice(),
+               snapshots: old.snapshots || {}, lastRefresh: old.lastRefresh || null,
+               scraperUrl: '' };
     }
   } catch (e) {}
-  return {
-    pharmacies: DEFAULT_PHARMACIES.slice(),
-    snapshots: {},
-    lastRefresh: null,
-  };
+  return { pharmacies: DEFAULT_PHARMACIES.slice(), snapshots: {}, lastRefresh: null, scraperUrl: '' };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 
@@ -298,8 +321,12 @@ function fmt(n, digits=0) {
   return Number(n).toLocaleString(undefined, {minimumFractionDigits: digits, maximumFractionDigits: digits});
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-/* ------------------------------- data ---------------------------------- */
+function parseDist(text) {
+  if (!text) return null;
+  const nums = String(text).replace(/["']/g,'').split(/[,\s]+/).map(n => parseInt(n.trim(), 10));
+  if (nums.length === 5 && nums.every(n => Number.isFinite(n) && n >= 0)) return nums;
+  return null;
+}
 function addSnapshot(name, date, data) {
   if (!state.snapshots[name]) state.snapshots[name] = [];
   const arr = state.snapshots[name];
@@ -309,7 +336,6 @@ function addSnapshot(name, date, data) {
   if (i >= 0) arr[i] = entry; else arr.push(entry);
   arr.sort((a,b) => a.date < b.date ? -1 : 1);
 }
-
 function latest(name) {
   const arr = state.snapshots[name];
   return arr && arr.length ? arr[arr.length-1] : null;
@@ -322,21 +348,101 @@ function earliestSince(name, days) {
   return arr[0];
 }
 
-function parseDist(text) {
-  if (!text) return null;
-  const nums = String(text).replace(/["']/g,'').split(/[,\s]+/).map(n => parseInt(n.trim(), 10));
-  if (nums.length === 5 && nums.every(n => Number.isFinite(n) && n >= 0)) return nums;
-  return null;
+/* ====================================================================
+   AUTO REFRESH (calls the Cloudflare scraper Worker)
+   ==================================================================== */
+
+function scraperEndpoint(targetUrl) {
+  const base = (state.scraperUrl || '').trim().replace(/\/+$/, '');
+  if (!base) return null;
+  return base + '/?url=' + encodeURIComponent(targetUrl);
 }
 
-/* --------------------------- snapshot form ----------------------------- */
+async function fetchOne(pharm) {
+  const endpoint = scraperEndpoint(pharm.url);
+  if (!endpoint) throw new Error('Scraper URL not set');
+  const res = await fetch(endpoint, { credentials: 'omit' });
+  let body;
+  try { body = await res.json(); } catch { body = null; }
+  if (!res.ok || !body || body.error) {
+    throw new Error((body && body.error) || `HTTP ${res.status}`);
+  }
+  if (body.rating == null || body.reviewCount == null) {
+    throw new Error('Scraper returned no rating');
+  }
+  return body;
+}
+
+async function refreshAll() {
+  if (!state.scraperUrl) { renderSetup(); return; }
+  if (!state.pharmacies.length) { toast('No pharmacies in Settings yet.', 'err'); return; }
+
+  $('#btn-refresh').disabled = true;
+  $('#status-section').style.display = '';
+  const status = $('#status-text');
+
+  const date = todayKey();
+  let ok = 0, fail = 0;
+  const errors = [];
+
+  for (let i = 0; i < state.pharmacies.length; i++) {
+    const ph = state.pharmacies[i];
+    status.textContent = `Refreshing ${i+1}/${state.pharmacies.length}: ${ph.name}…`;
+    try {
+      const data = await fetchOne(ph);
+      addSnapshot(ph.name, date, data);
+      ok++;
+    } catch (e) {
+      fail++;
+      errors.push(`${ph.name}: ${e.message}`);
+      console.warn('refresh failed', ph.name, e);
+    }
+    state.lastRefresh = nowISO();
+    save();
+    render();
+  }
+
+  $('#status-section').style.display = 'none';
+  $('#btn-refresh').disabled = false;
+
+  if (ok && !fail) toast(`Refreshed ${ok} pharmac${ok===1?'y':'ies'}.`, 'good');
+  else if (ok && fail) toast(`${ok} refreshed, ${fail} failed: ${errors[0]}`, 'err');
+  else toast(`All ${fail} failed: ${errors[0]}`, 'err');
+}
+
+async function testScraper() {
+  const url = $('#scraper-url').value.trim();
+  if (!url) { $('#scraper-test-result').textContent = 'Paste a URL first.'; return; }
+  const sample = state.pharmacies[0] && state.pharmacies[0].url;
+  if (!sample) { $('#scraper-test-result').textContent = 'Add a pharmacy first.'; return; }
+  $('#scraper-test-result').textContent = 'Testing…';
+  try {
+    const endpoint = url.replace(/\/+$/, '') + '/?url=' + encodeURIComponent(sample);
+    const res = await fetch(endpoint, { credentials: 'omit' });
+    const body = await res.json();
+    if (!res.ok || body.error) {
+      $('#scraper-test-result').innerHTML = `<span class="err">Failed: ${escapeHtml(body.error || ('HTTP ' + res.status))}</span>`;
+      return;
+    }
+    if (body.rating != null && body.reviewCount != null) {
+      $('#scraper-test-result').innerHTML = `<span style="color:var(--good)">OK — rating <b>${body.rating}</b>, <b>${fmt(body.reviewCount)}</b> reviews${body.dist?', distribution detected':''}.</span>`;
+    } else {
+      $('#scraper-test-result').innerHTML = `<span class="err">Worker reached but returned no rating. Response: ${escapeHtml(JSON.stringify(body))}</span>`;
+    }
+  } catch (e) {
+    $('#scraper-test-result').innerHTML = `<span class="err">Network error: ${escapeHtml(String(e.message || e))}</span>`;
+  }
+}
+
+/* ====================================================================
+   Manual form fallback (under Settings)
+   ==================================================================== */
+
 function renderSnapshotForm() {
   const wrap = $('#snapshot-form');
   wrap.innerHTML = '';
-  $('#snapshot-date').textContent = '(for ' + todayKey() + ')';
-
   if (!state.pharmacies.length) {
-    wrap.innerHTML = '<div class="muted small">No pharmacies yet — add some under Settings.</div>';
+    wrap.innerHTML = '<div class="muted small">No pharmacies yet.</div>';
     return;
   }
   for (const ph of state.pharmacies) {
@@ -345,19 +451,16 @@ function renderSnapshotForm() {
     row.className = 'snap-row';
     row.dataset.name = ph.name;
     row.innerHTML = `
-      <div class="snap-name">
-        ${ph.home ? '<span class="home-badge" title="Your pharmacy">★</span>' : ''}${escapeHtml(ph.name)}
-        <a class="snap-open" href="${ph.url}" target="_blank" rel="noopener">open ↗</a>
-      </div>
-      <input class="snap-rating"  type="number" step="0.1" min="0" max="5" placeholder="4.7"  value="${last && last.rating != null ? last.rating : ''}">
-      <input class="snap-reviews" type="number" step="1"   min="0"          placeholder="348"  value="${last && last.reviewCount != null ? last.reviewCount : ''}">
+      <div class="snap-name">${ph.home ? '<span class="home-badge">★</span>' : ''}${escapeHtml(ph.name)}
+        <a class="snap-open" href="${ph.url}" target="_blank" rel="noopener">open ↗</a></div>
+      <input class="snap-rating"  type="number" step="0.1" min="0" max="5" placeholder="4.7" value="${last && last.rating != null ? last.rating : ''}">
+      <input class="snap-reviews" type="number" step="1"   min="0"          placeholder="348" value="${last && last.reviewCount != null ? last.reviewCount : ''}">
       <input class="snap-dist"    type="text"                                placeholder="12,4,8,31,293" value="${last && last.dist ? last.dist.join(',') : ''}">
-      <div class="snap-last">${last ? (last.rating.toFixed(1) + ' · ' + fmt(last.reviewCount) + '<br><span class="muted">' + last.date + '</span>') : '<span class="muted">—</span>'}</div>
+      <div class="snap-last">${last ? last.rating.toFixed(1) + ' · ' + fmt(last.reviewCount) + '<br><span class="muted">' + last.date + '</span>' : '<span class="muted">—</span>'}</div>
     `;
     wrap.appendChild(row);
   }
 }
-
 function saveSnapshotFromForm() {
   const date = todayKey();
   let ok = 0, skipped = 0;
@@ -366,24 +469,37 @@ function saveSnapshotFromForm() {
     const r = parseFloat(row.querySelector('.snap-rating').value);
     const c = parseInt(row.querySelector('.snap-reviews').value, 10);
     const dist = parseDist(row.querySelector('.snap-dist').value);
-    if (!Number.isFinite(r) || !Number.isFinite(c)) { skipped++; continue; }
-    if (r < 0 || r > 5)  { skipped++; continue; }
+    if (!Number.isFinite(r) || !Number.isFinite(c) || r < 0 || r > 5) { skipped++; continue; }
     addSnapshot(name, date, { rating: r, reviewCount: c, dist });
     ok++;
   }
-  state.lastRefresh = nowISO();
-  save();
-  render();
-  toast(ok ? `Saved ${ok} snapshot${ok===1?'':'s'} for ${date}${skipped?` (${skipped} skipped)`:''}` : 'Nothing to save — fill in rating + reviews first.', ok ? '' : 'err');
+  if (ok) {
+    state.lastRefresh = nowISO();
+    save(); render();
+    toast(`Saved ${ok} snapshot${ok===1?'':'s'}${skipped?` (${skipped} skipped)`:''}`, 'good');
+  } else toast('Nothing to save', 'err');
 }
 
-function openAllInMaps() {
-  let blocked = 0;
-  for (const ph of state.pharmacies) {
-    const w = window.open(ph.url, '_blank', 'noopener');
-    if (!w) blocked++;
+/* ====================================================================
+   Setup banner
+   ==================================================================== */
+function renderSetup() {
+  const banner = $('#setup-banner');
+  if (!state.scraperUrl) {
+    banner.style.display = '';
+    $('#setup-url').value = '';
+  } else {
+    banner.style.display = 'none';
   }
-  if (blocked) toast(`${blocked} tab(s) blocked by your browser — allow pop-ups for this site.`, 'err');
+}
+function saveSetupUrl() {
+  const url = $('#setup-url').value.trim();
+  if (!url) { toast('Paste your Worker URL first', 'err'); return; }
+  state.scraperUrl = url;
+  save();
+  renderSetup();
+  toast('Worker URL saved — refreshing…', 'good');
+  setTimeout(refreshAll, 200);
 }
 
 /* ------------------------------- render -------------------------------- */
@@ -391,8 +507,9 @@ let sortBy = 'reviewCount', sortDir = -1;
 
 function render() {
   $('#last-refresh').textContent = state.lastRefresh
-    ? 'Last snapshot: ' + new Date(state.lastRefresh).toLocaleString()
+    ? 'Last refresh: ' + new Date(state.lastRefresh).toLocaleString()
     : 'No snapshots yet';
+  renderSetup();
   renderOverview();
   renderSnapshotForm();
   renderTable();
@@ -411,22 +528,17 @@ function renderOverview() {
   }
   const cur = latest(home.name);
   const wkAgo = earliestSince(home.name, 7);
-
   $('#o-rating').textContent  = cur ? cur.rating.toFixed(1) : '—';
   $('#o-reviews').textContent = cur ? fmt(cur.reviewCount) : '—';
-
   if (cur && wkAgo && wkAgo !== cur) {
-    const dr = cur.rating - wkAgo.rating;
-    const dc = cur.reviewCount - wkAgo.reviewCount;
-    setDelta('#o-rating-delta',  dr, v => (v>=0?'+':'') + v.toFixed(2) + ' / 7d');
-    setDelta('#o-reviews-delta', dc, v => (v>=0?'+':'') + fmt(v) + ' / 7d');
+    setDelta('#o-rating-delta',  cur.rating - wkAgo.rating,  v => (v>=0?'+':'') + v.toFixed(2) + ' / 7d');
+    setDelta('#o-reviews-delta', cur.reviewCount - wkAgo.reviewCount, v => (v>=0?'+':'') + fmt(v) + ' / 7d');
   } else {
     $('#o-rating-delta').textContent  = cur ? 'Need a second snapshot for trend' : 'No snapshots yet';
     $('#o-reviews-delta').textContent = cur ? 'Need a second snapshot for trend' : 'No snapshots yet';
     $('#o-rating-delta').classList.remove('good','bad');
     $('#o-reviews-delta').classList.remove('good','bad');
   }
-
   const rows = state.pharmacies.map(p => ({ p, cur: latest(p.name) })).filter(r => r.cur);
   const byRating  = rows.slice().sort((a,b) => b.cur.rating - a.cur.rating);
   const byReviews = rows.slice().sort((a,b) => b.cur.reviewCount - a.cur.reviewCount);
@@ -434,13 +546,10 @@ function renderOverview() {
   const rv = byReviews.findIndex(r => r.p.name === home.name);
   $('#o-rank-rating').textContent  = rr >= 0 ? `${rr+1} / ${rows.length}` : '—';
   $('#o-rank-reviews').textContent = rv >= 0 ? `${rv+1} / ${rows.length}` : '—';
-
   $('#o-rank-rating-note').textContent  = rr === 0 ? 'leading'
-    : rr > 0 ? `${(byRating[rr-1].cur.rating - byRating[rr].cur.rating).toFixed(2)} behind ${byRating[rr-1].p.name}`
-    : '';
+    : rr > 0 ? `${(byRating[rr-1].cur.rating - byRating[rr].cur.rating).toFixed(2)} behind ${byRating[rr-1].p.name}` : '';
   $('#o-rank-reviews-note').textContent = rv === 0 ? 'leading'
-    : rv > 0 ? `${fmt(byReviews[rv-1].cur.reviewCount - byReviews[rv].cur.reviewCount)} behind ${byReviews[rv-1].p.name}`
-    : '';
+    : rv > 0 ? `${fmt(byReviews[rv-1].cur.reviewCount - byReviews[rv].cur.reviewCount)} behind ${byReviews[rv-1].p.name}` : '';
 }
 
 function setDelta(sel, v, fmtFn) {
@@ -458,7 +567,7 @@ function renderTable() {
     const cur = latest(p.name);
     const wk = earliestSince(p.name, 7);
     return {
-      p, cur, wk,
+      p, cur,
       rating: cur ? cur.rating : null,
       reviewCount: cur ? cur.reviewCount : null,
       weekDelta:  cur && wk && wk !== cur ? cur.reviewCount - wk.reviewCount : null,
@@ -473,10 +582,9 @@ function renderTable() {
     if (sortBy === 'name') return va.p.name > vb.p.name ? sortDir : -sortDir;
     return (vb - va) * sortDir;
   });
-
   for (const r of rows) {
     const tr = document.createElement('tr');
-    const home = r.p.home ? '<span class="home-badge" title="Your pharmacy">★</span>' : '';
+    const home = r.p.home ? '<span class="home-badge">★</span>' : '';
     const stars = r.rating != null
       ? `<span class="stars" title="${r.rating.toFixed(1)}">${'★'.repeat(Math.round(r.rating))}${'☆'.repeat(5-Math.round(r.rating))}</span>`
       : '<span class="muted">—</span>';
@@ -487,15 +595,13 @@ function renderTable() {
       ? `<span class="${r.ratingDelta>0?'pill good':r.ratingDelta<0?'pill bad':'pill'}">${r.ratingDelta>=0?'+':''}${r.ratingDelta.toFixed(2)}</span>`
       : '<span class="muted">—</span>';
     const status = r.cur ? `<span class="pill good">tracking</span>` : `<span class="pill warn">no snapshot yet</span>`;
-
     tr.innerHTML = `
       <td class="name">${home}<a href="${r.p.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${escapeHtml(r.p.name)}</a></td>
       <td class="num">${r.rating != null ? `<span style="font-weight:600">${r.rating.toFixed(1)}</span> ${stars}` : stars}</td>
       <td class="num">${r.reviewCount != null ? fmt(r.reviewCount) : '—'}</td>
       <td class="num">${wkDelta}</td>
       <td class="num">${rtDelta}</td>
-      <td>${status}</td>
-    `;
+      <td>${status}</td>`;
     body.appendChild(tr);
   }
 }
@@ -503,29 +609,23 @@ function renderTable() {
 function renderHistory() {
   const svg = $('#history-chart');
   const legend = $('#history-legend');
-  svg.innerHTML = '';
-  legend.innerHTML = '';
-
+  svg.innerHTML = ''; legend.innerHTML = '';
   const W = 800, H = 220, padL = 40, padR = 12, padT = 12, padB = 26;
   const series = state.pharmacies.map(p => ({
     name: p.name, home: !!p.home,
     points: (state.snapshots[p.name] || []).map(s => ({ date: s.date, value: s.reviewCount })),
   })).filter(s => s.points.length > 0);
-
   if (!series.length) {
-    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No history yet — save a snapshot to start tracking.</text>`;
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No history yet — click Refresh all to populate.</text>`;
     return;
   }
-
   const allDates = [...new Set(series.flatMap(s => s.points.map(p => p.date)))].sort();
   const minV = Math.min(...series.flatMap(s => s.points.map(p => p.value)));
   const maxV = Math.max(...series.flatMap(s => s.points.map(p => p.value)));
   const pad = Math.max(1, (maxV - minV) * 0.1);
   const lo = Math.max(0, minV - pad), hi = maxV + pad;
-
   const xOf = i => padL + (i / Math.max(1, allDates.length - 1)) * (W - padL - padR);
   const yOf = v => padT + (1 - (v - lo) / (hi - lo || 1)) * (H - padT - padB);
-
   const ns = 'http://www.w3.org/2000/svg';
   for (let i=0; i<4; i++) {
     const y = padT + i*(H-padT-padB)/3;
@@ -543,34 +643,26 @@ function renderHistory() {
   if (allDates.length >= 2) {
     [0, allDates.length-1].forEach(i => {
       const t = document.createElementNS(ns, 'text');
-      t.setAttribute('x', xOf(i));
-      t.setAttribute('y', H - 8);
-      t.setAttribute('fill', '#8b95a7');
-      t.setAttribute('font-size', '10');
+      t.setAttribute('x', xOf(i)); t.setAttribute('y', H - 8);
+      t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
       t.setAttribute('text-anchor', i === 0 ? 'start' : 'end');
       t.textContent = allDates[i];
       svg.appendChild(t);
     });
   }
-
   const palette = ['#4f8cff','#2ecc71','#f5a623','#ff5a5f','#a55cff','#26d4cf','#ff8fbf','#9fb33f'];
   series.forEach((s, idx) => {
     const color = s.home ? '#ffd166' : palette[idx % palette.length];
     const pts = s.points.map(p => `${xOf(allDates.indexOf(p.date))},${yOf(p.value)}`).join(' ');
     const pl = document.createElementNS(ns, 'polyline');
-    pl.setAttribute('points', pts);
-    pl.setAttribute('fill', 'none');
-    pl.setAttribute('stroke', color);
-    pl.setAttribute('stroke-width', s.home ? '2.5' : '1.6');
-    pl.setAttribute('stroke-linejoin', 'round');
-    pl.setAttribute('stroke-linecap', 'round');
+    pl.setAttribute('points', pts); pl.setAttribute('fill', 'none');
+    pl.setAttribute('stroke', color); pl.setAttribute('stroke-width', s.home ? '2.5' : '1.6');
+    pl.setAttribute('stroke-linejoin', 'round'); pl.setAttribute('stroke-linecap', 'round');
     svg.appendChild(pl);
     s.points.forEach(p => {
       const c = document.createElementNS(ns, 'circle');
-      c.setAttribute('cx', xOf(allDates.indexOf(p.date)));
-      c.setAttribute('cy', yOf(p.value));
-      c.setAttribute('r', '2.5');
-      c.setAttribute('fill', color);
+      c.setAttribute('cx', xOf(allDates.indexOf(p.date))); c.setAttribute('cy', yOf(p.value));
+      c.setAttribute('r', '2.5'); c.setAttribute('fill', color);
       svg.appendChild(c);
     });
     const k = document.createElement('div');
@@ -608,7 +700,7 @@ function renderDistributions() {
       }).join('');
     wrap.appendChild(box);
   }
-  if (!any) wrap.innerHTML = '<div class="muted small">No star distributions yet. Add them in the snapshot form when you have a minute — they unlock the rating-distribution view per pharmacy.</div>';
+  if (!any) wrap.innerHTML = '<div class="muted small">Distribution shows once Refresh all has captured 1★-5★ breakdowns (auto-detected by the Worker).</div>';
 }
 
 function renderTargetSelect() {
@@ -637,43 +729,17 @@ function pharmaciesFromText(text) {
     return { home, name: body.slice(0, i).trim(), url: body.slice(i+1).trim() };
   }).filter(p => p && p.name && p.url);
 }
-
 function openSettings() {
-  $('#pharmacies').value = pharmaciesToText(state.pharmacies);
+  $('#pharmacies').value  = pharmaciesToText(state.pharmacies);
+  $('#scraper-url').value = state.scraperUrl || '';
   $('#settings-section').style.display = '';
   $('#settings-section').scrollIntoView({behavior:'smooth'});
 }
 function closeSettings() { $('#settings-section').style.display = 'none'; }
-
 function saveSettings() {
   state.pharmacies = pharmaciesFromText($('#pharmacies').value);
-  save();
-  render();
-  toast('Settings saved');
-}
-
-function bulkSave() {
-  const text = $('#bulk-data').value;
-  const date = todayKey();
-  let ok = 0, skipped = 0;
-  for (const line of text.split('\n').map(l=>l.trim()).filter(Boolean)) {
-    const parts = line.split('|').map(s=>s.trim());
-    if (parts.length < 3) { skipped++; continue; }
-    const [name, r, c, dist] = parts;
-    const rating = parseFloat(r);
-    const count  = parseInt(String(c).replace(/,/g,''), 10);
-    if (!Number.isFinite(rating) || !Number.isFinite(count) || rating < 0 || rating > 5) { skipped++; continue; }
-    addSnapshot(name, date, { rating, reviewCount: count, dist: parseDist(dist) });
-    ok++;
-  }
-  if (ok) {
-    state.lastRefresh = nowISO();
-    save(); render();
-    toast(`Bulk saved ${ok} snapshot${ok===1?'':'s'}${skipped?` (${skipped} skipped)`:''}`);
-    $('#bulk-data').value = '';
-  } else {
-    toast('No valid rows — format is `name | rating | count | s1,s2,s3,s4,s5`', 'err');
-  }
+  state.scraperUrl = $('#scraper-url').value.trim();
+  save(); render(); toast('Settings saved', 'good');
 }
 
 /* ----------------------------- target calc ----------------------------- */
@@ -682,10 +748,10 @@ function calcTarget() {
   const target = parseFloat($('#t-target').value);
   const mix = parseFloat($('#t-mix').value);
   const cur = latest(name);
-  if (!cur) { $('#t-result').innerHTML = '<span class="err">No snapshot for this pharmacy yet. Save one first.</span>'; return; }
+  if (!cur) { $('#t-result').innerHTML = '<span style="color:var(--bad)">No snapshot yet for this pharmacy.</span>'; return; }
   if (!(target > 0 && target <= 5)) { $('#t-result').textContent = 'Target must be 1.0–5.0'; return; }
   if (mix <= target) {
-    $('#t-result').innerHTML = `<span class="err">Average of new reviews (${mix}) must be higher than the target (${target}) — otherwise the rating can never reach it.</span>`;
+    $('#t-result').innerHTML = `<span style="color:var(--bad)">Average of new reviews (${mix}) must be higher than the target (${target}).</span>`;
     return;
   }
   const need = (target - cur.rating) * cur.reviewCount / (mix - target);
@@ -700,19 +766,14 @@ function calcTarget() {
   $('#t-result').innerHTML = `
     Need <b>${fmt(Math.ceil(need))}</b> new reviews averaging <b>${mix.toFixed(1)}★</b> to move
     <b>${escapeHtml(name)}</b> from <b>${cur.rating.toFixed(2)}</b> to <b>${target.toFixed(2)}</b>${eta}.
-    <div class="muted small" style="margin-top:6px">
-      Assumes no new ratings below your average. One 1★ while you're climbing pushes the goal further out.
-    </div>`;
+    <div class="muted small" style="margin-top:6px">Assumes no new ratings below your average.</div>`;
 }
 
 /* ----------------------------- import/export --------------------------- */
 function exportCSV() {
   const rows = [['date','pharmacy','rating','reviewCount','dist_1','dist_2','dist_3','dist_4','dist_5']];
   for (const [name, arr] of Object.entries(state.snapshots)) {
-    for (const s of arr) {
-      rows.push([s.date, name, s.rating ?? '', s.reviewCount ?? '',
-        ...(s.dist || ['','','','',''])]);
-    }
+    for (const s of arr) rows.push([s.date, name, s.rating ?? '', s.reviewCount ?? '', ...(s.dist || ['','','','',''])]);
   }
   const csv = rows.map(r => r.map(v => /[,"\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : v).join(',')).join('\n');
   download('pharmacy-reviews.csv', csv, 'text/csv');
@@ -727,32 +788,28 @@ function download(name, content, type) {
 function importJSON(file) {
   const r = new FileReader();
   r.onload = () => {
-    try {
-      const data = JSON.parse(r.result);
-      Object.assign(state, data);
-      save(); render(); toast('Imported');
-    } catch (e) { toast('Invalid JSON', 'err'); }
+    try { Object.assign(state, JSON.parse(r.result)); save(); render(); toast('Imported', 'good'); }
+    catch (e) { toast('Invalid JSON', 'err'); }
   };
   r.readAsText(file);
 }
 
 /* ------------------------------ bindings ------------------------------- */
 function bind() {
-  $('#btn-snap-jump').onclick = () => $('#snapshot-section').scrollIntoView({behavior:'smooth'});
-  $('#btn-save-snapshot').onclick = saveSnapshotFromForm;
-  $('#btn-open-all').onclick = openAllInMaps;
-  $('#btn-bulk').onclick = bulkSave;
+  $('#btn-refresh').onclick = refreshAll;
   $('#btn-export').onclick = exportCSV;
   $('#btn-config').onclick = () => $('#settings-section').style.display === 'none' ? openSettings() : closeSettings();
   $('#btn-close-settings').onclick = closeSettings;
   $('#btn-save-settings').onclick = saveSettings;
+  $('#btn-save-snapshot').onclick = saveSnapshotFromForm;
+  $('#btn-test-scraper').onclick = testScraper;
+  $('#btn-setup-save').onclick = saveSetupUrl;
   $('#btn-export-json').onclick = exportJSON;
   $('#btn-import').onclick = () => $('#file-import').click();
   $('#file-import').onchange = e => e.target.files[0] && importJSON(e.target.files[0]);
   $('#btn-clear').onclick = () => {
-    if (confirm('Delete all snapshots and reset pharmacy list?')) {
-      localStorage.removeItem(STORE_KEY);
-      localStorage.removeItem('pharmRev.v1');
+    if (confirm('Delete all snapshots and reset?')) {
+      localStorage.removeItem(STORE_KEY); localStorage.removeItem('pharmRev.v1');
       location.reload();
     }
   };
@@ -768,19 +825,17 @@ function bind() {
       renderTable();
     };
   });
-
-  // Enter inside any form input → save
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.closest && e.target.closest('.snap-row')) {
-      e.preventDefault();
-      saveSnapshotFromForm();
-    }
-  });
 }
 
-/* ------------------------------ boot ----------------------------------- */
 bind();
 render();
+
+// Auto-refresh on load if scraper is configured and we haven't refreshed today.
+if (state.scraperUrl) {
+  const today = todayKey();
+  const lastDate = state.lastRefresh ? state.lastRefresh.slice(0,10) : '';
+  if (lastDate !== today) setTimeout(refreshAll, 300);
+}
 </script>
 </body>
 </html>
