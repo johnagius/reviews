@@ -82,6 +82,16 @@ async function scrapeOnce(env, target, wantDebug) {
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
     await page.setViewport({ width: 1280, height: 900 });
 
+    // Inject __name as a global on every new document — this is the helper
+    // esbuild stamps around named function declarations for stack-trace
+    // readability. It lives in the bundled Worker scope, not the page's
+    // V8 isolate, so any page.evaluate-stringified function that references
+    // __name throws "__name is not defined" without this shim.
+    await page.evaluateOnNewDocument(() => {
+      // eslint-disable-next-line no-undef
+      window.__name = (fn) => fn;
+    });
+
     // Pre-set Google's consent-accept cookies on .google.com so we skip
     // the "Before you continue" interstitial on EU-egress requests.
     await page.setCookie(
