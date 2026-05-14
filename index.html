@@ -193,8 +193,8 @@
   </section>
 
   <section>
-    <h2>Review submission timeline <span class="muted small" style="font-weight:normal; text-transform:none; letter-spacing:0">(your pharmacy — older months smoothed by Google's "X years ago" precision)</span></h2>
-    <svg class="chart" id="timeline-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+    <h2>Review submission timeline <span class="muted small" style="font-weight:normal; text-transform:none; letter-spacing:0">(your pharmacy — one dot per review, older dates spread across the "X years ago" window)</span></h2>
+    <svg class="chart" id="timeline-chart" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
     <div class="legend" id="timeline-legend"></div>
   </section>
 
@@ -761,27 +761,50 @@ function renderTimeline() {
   const home = state.pharmacies.find(p => p.home) || state.pharmacies[0];
   const reviews = home ? latestReviews(home.name) : null;
 
-  const W = 800, H = 220, padL = 36, padR = 12, padT = 12, padB = 36;
+  const W = 800, H = 240, padL = 40, padR = 16, padT = 12, padB = 32;
   const ns = 'http://www.w3.org/2000/svg';
   if (!reviews || !reviews.length) {
     svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates yet — refresh after deploying the updated Worker.</text>`;
     return;
   }
 
-  // Trim leading empty months so the chart starts at the oldest review.
-  let buckets = reviewsByMonth(reviews, 60);
-  const firstNonEmpty = buckets.findIndex(b => b.total > 0.005);
-  if (firstNonEmpty > 0) buckets = buckets.slice(Math.max(0, firstNonEmpty - 1));
-  if (!buckets.length) return;
+  // For each review, compute a position. X = a deterministic-random offset
+  // inside the review's "X years ago" uncertainty window, so older reviews
+  // spread out across that year instead of stacking on a single date.
+  const seedRand = (n) => { const x = Math.sin(n) * 10000; return x - Math.floor(x); };
+  const now = Date.now();
+  const points = [];
+  reviews.forEach((r, i) => {
+    const w = parseReviewAgo(r.ago);
+    if (!w) return;
+    const stars = (r.stars >= 1 && r.stars <= 5) ? r.stars : null;
+    if (!stars) return;
+    const xFrac = seedRand(i * 17 + (r.ago || '').length * 31);
+    const yJitter = (seedRand(i * 71 + 3) - 0.5) * 0.55;
+    points.push({
+      t: w.startMs + (w.endMs - w.startMs) * xFrac,
+      stars,
+      yJitter,
+      ago: r.ago,
+    });
+  });
+  if (!points.length) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates parsed.</text>`;
+    return;
+  }
 
-  const maxV = Math.max(0.5, ...buckets.map(b => b.total));
-  const xStep = (W - padL - padR) / buckets.length;
-  const xOf = i => padL + i * xStep;
-  const yOf = v => padT + (1 - v / maxV) * (H - padT - padB);
+  let minT = Math.min(...points.map(p => p.t));
+  const maxT = Math.max(now, ...points.map(p => p.t));
+  // Pad left so leftmost dot isn't flush against the axis.
+  minT -= (maxT - minT) * 0.02;
 
-  // Gridlines + y labels
-  for (let i = 0; i < 4; i++) {
-    const y = padT + i * (H - padT - padB) / 3;
+  const xOf = t => padL + ((t - minT) / Math.max(1, maxT - minT)) * (W - padL - padR);
+  // Y: 1..5 stars, with a little headroom for jitter.
+  const yOf = stars => padT + ((5.5 - stars) / 5) * (H - padT - padB);
+
+  // Horizontal gridlines per star + Y axis labels.
+  for (let s = 1; s <= 5; s++) {
+    const y = yOf(s);
     const ln = document.createElementNS(ns, 'line');
     ln.setAttribute('x1', padL); ln.setAttribute('x2', W - padR);
     ln.setAttribute('y1', y); ln.setAttribute('y2', y);
@@ -790,58 +813,58 @@ function renderTimeline() {
     const lbl = document.createElementNS(ns, 'text');
     lbl.setAttribute('x', 6); lbl.setAttribute('y', y + 3);
     lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
-    const val = maxV - i * maxV / 3;
-    lbl.textContent = (val >= 10 ? Math.round(val) : val.toFixed(1));
+    lbl.textContent = `${s}★`;
     svg.appendChild(lbl);
   }
 
-  // X-axis labels — show ~6 evenly-spaced ticks.
-  const ticks = Math.min(6, buckets.length);
-  for (let i = 0; i < ticks; i++) {
-    const idx = Math.round(i * (buckets.length - 1) / Math.max(1, ticks - 1));
+  // X-axis ticks at year boundaries within the visible range.
+  const minYear = new Date(minT).getFullYear();
+  const maxYear = new Date(maxT).getFullYear();
+  const yearSpan = maxYear - minYear;
+  const yearStep = yearSpan > 8 ? 2 : 1;
+  for (let yr = minYear; yr <= maxYear; yr += yearStep) {
+    const tickT = new Date(yr, 0, 1).getTime();
+    if (tickT < minT) continue;
+    const x = xOf(tickT);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', x); ln.setAttribute('x2', x);
+    ln.setAttribute('y1', padT); ln.setAttribute('y2', H - padB);
+    ln.setAttribute('stroke', '#1b212c');
+    svg.appendChild(ln);
     const t = document.createElementNS(ns, 'text');
-    t.setAttribute('x', xOf(idx) + xStep / 2); t.setAttribute('y', H - 18);
+    t.setAttribute('x', x); t.setAttribute('y', H - 14);
     t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
     t.setAttribute('text-anchor', 'middle');
-    t.textContent = buckets[idx].label;
+    t.textContent = String(yr);
     svg.appendChild(t);
   }
 
-  // Stacked bars by star rating: 5★ at the bottom, 1★ on top.
+  // Plot dots — one per review.
   const starColor = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
-  buckets.forEach((b, i) => {
-    let yCursor = H - padB;
-    for (const star of [5, 4, 3, 2, 1]) {
-      const c = b.counts[star - 1];
-      if (c <= 0) continue;
-      const h = (c / maxV) * (H - padT - padB);
-      const rect = document.createElementNS(ns, 'rect');
-      rect.setAttribute('x', xOf(i) + 1);
-      rect.setAttribute('width', Math.max(0, xStep - 2));
-      rect.setAttribute('y', yCursor - h);
-      rect.setAttribute('height', h);
-      rect.setAttribute('fill', starColor[star]);
-      rect.setAttribute('opacity', '0.85');
-      const title = document.createElementNS(ns, 'title');
-      title.textContent = `${b.label}: ~${c.toFixed(1)} × ${star}★`;
-      rect.appendChild(title);
-      svg.appendChild(rect);
-      yCursor -= h;
-    }
-  });
+  for (const p of points) {
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', xOf(p.t));
+    c.setAttribute('cy', yOf(p.stars + p.yJitter));
+    c.setAttribute('r', '3');
+    c.setAttribute('fill', starColor[p.stars]);
+    c.setAttribute('opacity', '0.7');
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = `${p.stars}★ — ${p.ago}`;
+    c.appendChild(title);
+    svg.appendChild(c);
+  }
 
   // Legend
   for (const star of [5, 4, 3, 2, 1]) {
     const k = document.createElement('div');
     k.className = 'key';
-    k.innerHTML = `<span class="swatch" style="background:${starColor[star]}"></span>${star}★`;
+    k.innerHTML = `<span class="swatch" style="background:${starColor[star]}; width:8px; height:8px; border-radius:50%"></span>${star}★`;
     legend.appendChild(k);
   }
-  const total = reviews.length;
   const note = document.createElement('div');
   note.className = 'key muted';
   note.style.marginLeft = 'auto';
-  note.textContent = `Based on ${total} reviews — older months smoothed across the 'X years ago' window.`;
+  note.textContent = `${points.length} reviews — older dates spread across their "X years ago" window so density is visible.`;
   legend.appendChild(note);
 }
 
