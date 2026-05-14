@@ -22,3 +22,18 @@ proxy. State lives in `localStorage`. Optional Cloudflare Worker proxy in
 
 Keep `index.html` self-contained — no build step, no external runtime deps.
 That's what makes it work as a GitHub Pages site with zero configuration.
+
+## After updating `worker.js`
+
+GitHub Pages auto-deploys `index.html`, but the Cloudflare Worker doesn't
+auto-redeploy from this repo — the user has to push it. After every commit
+that touches `worker.js`, end the reply with:
+
+1. The raw download link for the current `main`:
+   `https://raw.githubusercontent.com/johnagius/reviews/main/worker.js`
+2. Both redeploy paths:
+   - **CLI:** `git pull && npx wrangler deploy`
+   - **Dashboard:** Cloudflare → Workers & Pages → `pharm-scraper` → Edit code → paste the raw file contents → Save and deploy.
+
+Don't skip this even if the change feels minor — until the Worker is
+redeployed, the dashboard still hits the old code.
