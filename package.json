@@ -1,0 +1,17 @@
+{
+  "name": "pharm-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker that scrapes Google Maps place pages via headless Chromium for the Pharmacy Review Tracker.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^0.0.14"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  }
+}

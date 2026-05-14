@@ -20,11 +20,11 @@ against competitors using public Google Maps data, fetched through a
 Cloudflare Worker (`worker.js`) that runs headless Chromium. State lives
 in `localStorage`.
 
-The repo is intentionally just three live files:
+Live files in the repo:
 
 - `index.html` — the dashboard, served by GitHub Pages from `main`
-- `worker.js` — the Cloudflare Worker source (manually pasted into the
-  Cloudflare dashboard editor)
+- `worker.js` — the Cloudflare Worker source
+- `wrangler.toml` + `package.json` — config for `npx wrangler deploy`
 - `README.md` + `CLAUDE.md` — docs
 
 Keep `index.html` self-contained — no build step, no external runtime deps.
@@ -32,14 +32,16 @@ That's what makes it work as a GitHub Pages site with zero configuration.
 
 ## User workflow
 
-The user **does not use git locally**. They view and download files from
-GitHub's web UI / raw links, and paste into Cloudflare's dashboard editor.
-Don't suggest `git pull`, `wrangler deploy`, `npm install`, or any other
-CLI step — they won't run it.
+The user **does not use git locally**. To redeploy the Worker they:
 
-Don't add `wrangler.toml`, `package.json`, `.gitignore`, or any other
-CLI/build scaffolding back to the repo. They were removed as dead weight
-because the user's flow is dashboard-paste only.
+1. Download the repo as a zip from GitHub's "Code → Download ZIP" button
+   (URL: `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`)
+2. Unzip somewhere
+3. Run `npx wrangler deploy` in the unzipped folder
+
+So they DO use a terminal, just not git. Don't suggest `git pull` /
+`git clone` — they download fresh zips. Keep `wrangler.toml` and
+`package.json` intact; without them, `wrangler deploy` won't work.
 
 ## After updating `worker.js`
 
@@ -48,16 +50,19 @@ push, so dashboard changes need no user action. The Cloudflare Worker is
 different — it does **not** auto-redeploy from this repo, so the user has
 to push it manually.
 
-After every commit that touches `worker.js`, end the reply with:
+After every commit that touches `worker.js`, `wrangler.toml`, or
+`package.json`, end the reply with:
 
-1. The raw link for the file on `main`:
-   `https://raw.githubusercontent.com/johnagius/reviews/main/worker.js`
-2. The dashboard redeploy steps:
-   - Cloudflare → Workers & Pages → `pharm-scraper` → Edit code
-   - Open the raw link above, select all, copy
-   - Paste over the editor contents → Save and deploy
-3. A reminder that until they redeploy, the dashboard still hits the old code.
+1. The zip download link for the current `main`:
+   `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`
+2. The redeploy command (run in the unzipped folder):
+   ```
+   npx wrangler deploy
+   ```
+   (first time only, run `npm install` first, or let `npx` fetch wrangler)
+3. A reminder that until they run that, the dashboard still hits the
+   old Worker code.
 
 If a commit touches **only** `index.html` (or other files that aren't
-`worker.js`), say so explicitly and tell the user no Worker redeploy is
-needed — GitHub Pages handles it.
+Worker-related), say so explicitly and tell the user no Worker redeploy
+is needed — GitHub Pages handles it.
