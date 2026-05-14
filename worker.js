@@ -185,34 +185,28 @@ async function isConsentPage(page) {
   });
 }
 
-const REVIEW_ITEM_SELECTOR =
-  '[data-review-id], div[jscontroller][jsdata*="review"], div[aria-label][jslog*="review"]';
+// Recognise relative-date strings Maps puts on individual review cards.
+const AGO_RE_SRC =
+  '^(?:(?:\\d+|a|an)\\s+(?:second|minute|hour|day|week|month|year)s?\\s+ago|yesterday|just now|moments?\\s+ago)$';
+const EDITED_AGO_RE_SRC =
+  '^edited\\s+((?:\\d+|a|an)\\s+(?:second|minute|hour|day|week|month|year)s?\\s+ago)$';
 
 async function scrapeReviews(page) {
-  // Open the Reviews tab/panel. Try the standard "Reviews" tab first, then
-  // any "See all reviews" / "more reviews" button as a fallback.
-  await page.evaluate((sel) => {
-    if (document.querySelector(sel)) return;
-    const visibleText = el => ((el.innerText || el.textContent || '').trim().split('\n')[0] || '').toLowerCase();
-    const tabs = Array.from(document.querySelectorAll('button[role="tab"], div[role="tab"]'));
-    const tab = tabs.find(t => visibleText(t) === 'reviews');
-    if (tab && tab.getAttribute('aria-selected') !== 'true') {
-      (tab.closest('button') || tab).click();
-      return;
-    }
-    const more = Array.from(document.querySelectorAll('button, a[role="button"]'))
-      .find(el => /^(see all reviews|more reviews|all reviews|view all reviews)/i.test(visibleText(el)));
-    if (more) (more.closest('button') || more).click();
-  }, REVIEW_ITEM_SELECTOR);
-
-  await page.waitForSelector(REVIEW_ITEM_SELECTOR, { timeout: 10000 }).catch(() => {});
-
-  // Scroll the reviews container until lazy-loading stops adding entries.
-  await page.evaluate(async (sel) => {
+  // After the rating click in phase 2, the breakdown overlay is open and the
+  // 1★–5★ rows are visible. Individual reviews sit in the SAME scrollable
+  // overlay just below the distribution, so we anchor scrolling on the dist
+  // row's nearest scrollable ancestor (we know it exists; data-review-id
+  // does not always).
+  await page.evaluate(async (agoSrc) => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const first = document.querySelector(sel);
-    if (!first) return;
-    let scroller = first.parentElement;
+    const agoRe = new RegExp(agoSrc, 'i');
+    const isReviewSpan = el => agoRe.test((el.textContent || '').trim());
+
+    const anchor = document.querySelector('[aria-label*="stars, "], [aria-label*=" star, "]')
+                || document.querySelector('[data-review-id]')
+                || Array.from(document.querySelectorAll('span')).find(isReviewSpan);
+    if (!anchor) return;
+    let scroller = anchor.parentElement;
     while (scroller && scroller !== document.body) {
       const cs = getComputedStyle(scroller);
       if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll')
@@ -220,52 +214,63 @@ async function scrapeReviews(page) {
       scroller = scroller.parentElement;
     }
     if (!scroller || scroller === document.body) {
-      // Last resort: scroll the window itself.
       scroller = document.scrollingElement || document.documentElement;
     }
+    const countReviews = () => Array.from(document.querySelectorAll('span'))
+      .filter(isReviewSpan).length;
     const HARD_CAP = 1500, MAX_ITER = 300;
     let last = 0, stable = 0;
     for (let i = 0; i < MAX_ITER && stable < 4; i++) {
       scroller.scrollTop = scroller.scrollHeight;
       await sleep(350);
-      const cur = document.querySelectorAll(sel).length;
+      const cur = countReviews();
       if (cur >= HARD_CAP) break;
       if (cur === last) stable++;
       else { stable = 0; last = cur; }
     }
-  }, REVIEW_ITEM_SELECTOR);
+  }, AGO_RE_SRC);
 
-  return await page.evaluate((sel) => {
+  return await page.evaluate((agoSrc, editedSrc) => {
+    const agoRe = new RegExp(agoSrc, 'i');
+    const editedRe = new RegExp(editedSrc, 'i');
     const out = [];
     const seen = new Set();
-    document.querySelectorAll(sel).forEach(item => {
-      const id = item.getAttribute('data-review-id') || item.outerHTML.slice(0, 80);
-      if (seen.has(id)) return;
-      seen.add(id);
-
-      let stars = null;
-      // Try aria-label patterns the rating widget exposes: "5 stars" / "Rated 4.0 out of 5".
-      const starCandidates = item.querySelectorAll('[aria-label]');
-      for (const el of starCandidates) {
-        const lbl = el.getAttribute('aria-label') || '';
-        let m = lbl.match(/(?:^|\s)(\d)\s+stars?(?:\s|$|,)/i)
-             || lbl.match(/Rated\s+([1-5])(?:\.0)?\s+out of 5/i);
-        if (m) { stars = parseInt(m[1], 10); break; }
-      }
-
+    // Find every relative-date span on the page, then walk up to the
+    // nearest ancestor that also contains a star-rating element. That
+    // ancestor is the review card.
+    for (const span of document.querySelectorAll('span')) {
+      const txt = (span.textContent || '').trim();
       let ago = null;
-      for (const s of item.querySelectorAll('span')) {
-        const t = (s.textContent || '').trim();
-        if (/^(?:(?:\d+|a|an)\s+(?:second|minute|hour|day|week|month|year)s?\s+ago|yesterday|just now|moments?\s+ago)$/i.test(t)) {
-          ago = t; break;
-        }
-        const m = t.match(/^edited\s+((?:\d+|a|an)\s+(?:second|minute|hour|day|week|month|year)s?\s+ago)$/i);
-        if (m) { ago = m[1]; break; }
+      if (agoRe.test(txt)) ago = txt;
+      else {
+        const m = txt.match(editedRe);
+        if (m) ago = m[1];
       }
-      if (ago && stars != null) out.push({ ago, stars });
-    });
+      if (!ago) continue;
+
+      let p = span.parentElement, stars = null, card = null;
+      for (let i = 0; i < 10 && p; i++) {
+        const starEl = p.querySelector('[role="img"][aria-label*=" star"], [aria-label$=" stars"], [aria-label$=" star"]');
+        if (starEl) {
+          const lbl = starEl.getAttribute('aria-label') || '';
+          // Skip the place-level rating widget which mentions "X reviews"
+          // (we want individual review cards with a single star count).
+          if (/\d+\s+reviews?/i.test(lbl)) { p = p.parentElement; continue; }
+          const m = lbl.match(/^(\d)\s+stars?$/i)
+                 || lbl.match(/Rated\s+([1-5])(?:\.0)?\s+out of 5/i);
+          if (m) { stars = parseInt(m[1], 10); card = p; break; }
+        }
+        p = p.parentElement;
+      }
+      if (stars == null || !card) continue;
+      const key = (card.getAttribute && card.getAttribute('data-review-id'))
+               || (card.outerHTML || '').slice(0, 60);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ago, stars });
+    }
     return out;
-  }, REVIEW_ITEM_SELECTOR);
+  }, AGO_RE_SRC, EDITED_AGO_RE_SRC);
 }
 
 async function dismissConsent(page) {
