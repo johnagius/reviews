@@ -228,6 +228,14 @@ async function scrapeReviews(page, diag) {
   let scrapeInfo;
   try {
     scrapeInfo = await page.evaluate(async () => {
+      // wrangler/esbuild wraps named function declarations with __name() for
+      // nicer stack traces. That variable only exists in the bundled Worker
+      // scope, not in the page context page.evaluate runs in — so any inner
+      // `function foo()` would throw "__name is not defined". Polyfill it
+      // and also prefer arrow functions inside page.evaluate to avoid the
+      // wrap entirely.
+      // eslint-disable-next-line no-unused-vars
+      const __name = (fn) => fn;
       const sleep = ms => new Promise(r => setTimeout(r, ms));
       const info = { anchor: null, scroller: null, iters: 0, finalCount: 0, scrollables: 0 };
       let anchor = document.querySelector('[data-review-id]')
@@ -238,7 +246,7 @@ async function scrapeReviews(page, diag) {
       }
       info.anchor = anchor.hasAttribute('data-review-id') ? 'review' : 'dist';
 
-      function findScrollable(start) {
+      const findScrollable = (start) => {
         let s = start && start.parentElement;
         while (s && s !== document.body) {
           const cs = getComputedStyle(s);
@@ -247,7 +255,7 @@ async function scrapeReviews(page, diag) {
           s = s.parentElement;
         }
         return null;
-      }
+      };
       let scroller = findScrollable(anchor);
       if (!scroller) scroller = document.scrollingElement || document.documentElement;
       const cls = typeof scroller.className === 'string' ? scroller.className : '';
@@ -289,6 +297,8 @@ async function scrapeReviews(page, diag) {
 
   try {
     return await page.evaluate((agoSrc, editedSrc) => {
+      // eslint-disable-next-line no-unused-vars
+      const __name = (fn) => fn;
       const agoRe = new RegExp(agoSrc, 'i');
       const editedRe = new RegExp(editedSrc, 'i');
       const out = [];
