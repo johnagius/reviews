@@ -223,15 +223,24 @@ async function scrapeReviews(page) {
     if (!scroller || scroller === document.body) {
       scroller = document.scrollingElement || document.documentElement;
     }
-    const HARD_CAP = 1500, MAX_ITER = 300;
+    const HARD_CAP = 1500, MAX_ITER = 300, WARMUP_ITERS = 25;
     let last = 0, stable = 0;
-    for (let i = 0; i < MAX_ITER && stable < 4; i++) {
+    for (let i = 0; i < MAX_ITER; i++) {
       scroller.scrollTop = scroller.scrollHeight;
-      await sleep(350);
+      await sleep(400);
       const cur = document.querySelectorAll('[data-review-id]').length;
       if (cur >= HARD_CAP) break;
+      // Don't apply the stability check until we've loaded at least one
+      // review — otherwise "0 == 0" trips immediately and we bail before
+      // Google's lazy-load fires. Cap warmup at ~10s so we still exit if
+      // reviews truly never appear.
+      if (cur === 0) {
+        if (i >= WARMUP_ITERS) break;
+        continue;
+      }
       if (cur === last) stable++;
       else { stable = 0; last = cur; }
+      if (stable >= 4) break;
     }
   });
 
