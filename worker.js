@@ -151,10 +151,28 @@ async function scrapeOnce(env, target, wantDebug) {
     } catch (e) {}
 
     const dist = await page.evaluate(extractDistribution);
-    const reviews = await scrapeReviews(page).catch(() => []);
+
+    // If clicking the rating didn't bring up the actual reviews list, click
+    // the Reviews tab explicitly. This happens when the rating click only
+    // shows the dist popup overlay rather than navigating the side panel.
+    if ((await page.$$('[data-review-id]')).length === 0) {
+      await page.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+        const reviewsTab = tabs.find(t =>
+          /^reviews$/i.test(((t.innerText || t.textContent || '').trim().split('\n')[0] || '')));
+        if (reviewsTab) (reviewsTab.closest('button') || reviewsTab).click();
+      });
+      await page.waitForSelector('[data-review-id]', { timeout: 8000 }).catch(() => {});
+    }
+
+    const scrapeDiag = wantDebug ? { anchorFound: false, scrollerInfo: null, iters: 0, finalCount: 0 } : null;
+    const reviews = await scrapeReviews(page, scrapeDiag).catch(() => []);
 
     const data = { ...basic, dist, reviews };
-    if (wantDebug) data._debug = await page.evaluate(collectDebug);
+    if (wantDebug) {
+      data._debug = await page.evaluate(collectDebug);
+      if (scrapeDiag) data._debug.scrape = scrapeDiag;
+    }
     return { data, limited, error: null };
   } catch (e) {
     return { data: null, limited: false, error: String(e && e.message || e) };
@@ -203,37 +221,58 @@ const AGO_RE_SRC =
 const EDITED_AGO_RE_SRC =
   '^edited\\s+((?:\\d+|a|an)\\s+(?:second|minute|hour|day|week|month|year)s?\\s+ago)$';
 
-async function scrapeReviews(page) {
-  // After the rating click in phase 2, the breakdown overlay is open and the
-  // 1★–5★ rows + individual reviews live in the same scrollable container.
-  // Anchor on a dist row (reliable — we just confirmed all 5 are present)
-  // and walk up to find the scrollable ancestor.
-  await page.evaluate(async () => {
+async function scrapeReviews(page, diag) {
+  // After the rating click + Reviews-tab fallback, scroll the reviews
+  // container. Anchor first on [data-review-id] (the actual review
+  // cards — if they exist, scrolling THEIR container is the right
+  // thing). Fall back to scrolling the dist row's scroll ancestor if
+  // not. Last resort: scroll all scrollable elements on the page,
+  // since Maps' panel layout varies.
+  const scrapeInfo = await page.evaluate(async () => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const anchor = document.querySelector('[aria-label*="stars, "], [aria-label*=" star, "]')
-                || document.querySelector('[data-review-id]');
-    if (!anchor) return;
-    let scroller = anchor.parentElement;
-    while (scroller && scroller !== document.body) {
-      const cs = getComputedStyle(scroller);
-      if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll')
-          && scroller.scrollHeight > scroller.clientHeight + 4) break;
-      scroller = scroller.parentElement;
+    const info = { anchor: null, scroller: null, iters: 0, finalCount: 0, scrollables: 0 };
+    let anchor = document.querySelector('[data-review-id]')
+              || document.querySelector('[aria-label*="stars, "], [aria-label*=" star, "]');
+    if (!anchor) {
+      info.anchor = 'none';
+      return info;
     }
-    if (!scroller || scroller === document.body) {
-      scroller = document.scrollingElement || document.documentElement;
+    info.anchor = anchor.hasAttribute('data-review-id') ? 'review' : 'dist';
+
+    function findScrollable(start) {
+      let s = start && start.parentElement;
+      while (s && s !== document.body) {
+        const cs = getComputedStyle(s);
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll')
+            && s.scrollHeight > s.clientHeight + 4) return s;
+        s = s.parentElement;
+      }
+      return null;
     }
+    let scroller = findScrollable(anchor);
+    if (!scroller) scroller = document.scrollingElement || document.documentElement;
+    info.scroller = `${scroller.tagName}.${(scroller.className || '').split(' ').slice(0,2).join('.')}` +
+                    `[h=${scroller.scrollHeight},vh=${scroller.clientHeight}]`;
+
+    // Also collect every visible scrollable container — we'll scroll them
+    // ALL each iteration. This is cheap and avoids picking the wrong one.
+    const allScrollables = Array.from(document.querySelectorAll('*')).filter(el => {
+      const cs = getComputedStyle(el);
+      return (cs.overflowY === 'auto' || cs.overflowY === 'scroll')
+          && el.scrollHeight > el.clientHeight + 4;
+    });
+    info.scrollables = allScrollables.length;
+
     const HARD_CAP = 1500, MAX_ITER = 300, WARMUP_ITERS = 25;
     let last = 0, stable = 0;
     for (let i = 0; i < MAX_ITER; i++) {
+      info.iters = i + 1;
       scroller.scrollTop = scroller.scrollHeight;
+      for (const s of allScrollables) s.scrollTop = s.scrollHeight;
       await sleep(400);
       const cur = document.querySelectorAll('[data-review-id]').length;
+      info.finalCount = cur;
       if (cur >= HARD_CAP) break;
-      // Don't apply the stability check until we've loaded at least one
-      // review — otherwise "0 == 0" trips immediately and we bail before
-      // Google's lazy-load fires. Cap warmup at ~10s so we still exit if
-      // reviews truly never appear.
       if (cur === 0) {
         if (i >= WARMUP_ITERS) break;
         continue;
@@ -242,7 +281,9 @@ async function scrapeReviews(page) {
       else { stable = 0; last = cur; }
       if (stable >= 4) break;
     }
+    return info;
   });
+  if (diag) Object.assign(diag, scrapeInfo);
 
   // Extract each [data-review-id] card. For star detection accept several
   // aria-label shapes ("5 stars", "5 stars,", "Rated 5.0 out of 5"). For
