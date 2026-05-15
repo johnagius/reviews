@@ -105,7 +105,12 @@ async function scrapeOnce(env, target, wantDebug) {
       { name: 'CONSENT', value: 'YES+cb', domain: '.google.com', path: '/' }
     );
 
-    const goUrl = withParam(target, 'hl', 'en');
+    // Prefer the CID form (shorter, no apostrophe / !-encoded segments) when
+    // we can extract the CID from the original URL. Falls back to the
+    // user-supplied URL when CID extraction fails (e.g. for older /place/
+    // URLs that don't carry the FID).
+    const cidUrl = placeUrlToCid(target);
+    const goUrl = withParam(cidUrl || target, 'hl', 'en');
     await page.goto(goUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     if (await isConsentPage(page)) {
@@ -210,6 +215,22 @@ function withParam(rawUrl, key, value) {
     return u.toString();
   } catch {
     return rawUrl;
+  }
+}
+
+// Google Maps place URLs encode the Feature ID as "!1s0x<hex1>:0x<hex2>"
+// inside the /data= segment. The second hex is the Customer ID (CID), and
+// Google accepts a much simpler "https://www.google.com/maps?cid=<decimal>"
+// URL that opens the same place. Prefer the CID form when we can extract
+// it — it's shorter, has no apostrophe / !-segments, and dodges the URL-
+// encoding fragility we hit with the original place-path form.
+function placeUrlToCid(rawUrl) {
+  try {
+    const m = rawUrl.match(/!1s0x[0-9a-f]+:0x([0-9a-f]+)/i);
+    if (!m) return null;
+    return 'https://www.google.com/maps?cid=' + BigInt('0x' + m[1]).toString();
+  } catch {
+    return null;
   }
 }
 
