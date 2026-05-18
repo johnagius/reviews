@@ -138,6 +138,15 @@
       <div class="stat"><div class="label">Span</div><div class="value" style="font-size:16px" id="s-span">—</div><div class="sub" id="s-span-sub"></div></div>
     </div>
 
+    <div class="grid six" style="margin-bottom:14px">
+      <div class="stat"><div class="label">Positive (4-5★)</div><div class="value" id="s-pos">—</div><div class="sub" id="s-pos-sub"></div></div>
+      <div class="stat"><div class="label">Critical (1-2★)</div><div class="value" id="s-crit">—</div><div class="sub" id="s-crit-sub"></div></div>
+      <div class="stat"><div class="label">Days since last review</div><div class="value" id="s-since">—</div><div class="sub" id="s-since-sub"></div></div>
+      <div class="stat"><div class="label">Days since last critical</div><div class="value" id="s-since-crit">—</div><div class="sub" id="s-since-crit-sub"></div></div>
+      <div class="stat"><div class="label">Bayesian score</div><div class="value" id="s-bayes">—</div><div class="sub" id="s-bayes-sub"></div></div>
+      <div class="stat"><div class="label">12-mo trend</div><div class="value" style="font-size:18px" id="s-trend">—</div><div class="sub" id="s-trend-sub"></div></div>
+    </div>
+
     <section>
       <h2>Star distribution</h2>
       <div id="distribution"></div>
@@ -147,6 +156,12 @@
       <h2>Cumulative reviews over time</h2>
       <svg class="chart" id="chart-cumulative" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
       <div class="legend" id="legend-cumulative"></div>
+    </section>
+
+    <section>
+      <h2>Review velocity <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(rolling 90-day rate, reviews per month)</span></h2>
+      <svg class="chart" id="chart-velocity" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
+      <div class="legend" id="legend-velocity"></div>
     </section>
 
     <section>
@@ -166,9 +181,25 @@
       <div class="grid four">
         <div class="stat"><div class="label">With written text</div><div class="value" id="e-text">—</div><div class="sub" id="e-text-sub"></div></div>
         <div class="stat"><div class="label">Owner responses</div><div class="value" id="e-resp">—</div><div class="sub" id="e-resp-sub"></div></div>
+        <div class="stat"><div class="label">Critical responses</div><div class="value" id="e-resp-crit">—</div><div class="sub" id="e-resp-crit-sub"></div></div>
+        <div class="stat"><div class="label">Avg text length</div><div class="value" id="e-text-len">—</div><div class="sub" id="e-text-len-sub"></div></div>
         <div class="stat"><div class="label">Total likes</div><div class="value" id="e-likes">—</div><div class="sub" id="e-likes-sub"></div></div>
         <div class="stat"><div class="label">Languages</div><div class="value" style="font-size:18px" id="e-lang">—</div><div class="sub" id="e-lang-sub"></div></div>
       </div>
+    </section>
+
+    <section>
+      <h2>Patterns &amp; records</h2>
+      <div class="grid four">
+        <div class="stat"><div class="label">Year-on-year</div><div class="value" id="p-yoy">—</div><div class="sub" id="p-yoy-sub"></div></div>
+        <div class="stat"><div class="label">Best year</div><div class="value" style="font-size:18px" id="p-best">—</div><div class="sub" id="p-best-sub"></div></div>
+        <div class="stat"><div class="label">Longest 5★ streak</div><div class="value" id="p-streak">—</div><div class="sub" id="p-streak-sub"></div></div>
+        <div class="stat"><div class="label">Longest quiet period</div><div class="value" id="p-gap">—</div><div class="sub" id="p-gap-sub"></div></div>
+      </div>
+      <table id="dow-table" style="margin-top:12px">
+        <thead><tr><th>Day of week</th><th class="num">Reviews</th><th class="num">Share</th><th class="num">Avg rating</th></tr></thead>
+        <tbody></tbody>
+      </table>
     </section>
 
     <section>
@@ -328,28 +359,158 @@ function inferName(reviews, fileName) {
 
 /* =========================== Statistics ============================== */
 
+// Many reviews share an identical timestamp because the source scraper
+// derives "exact" dates from "X years ago" strings — every review tagged
+// "1 year ago" gets the same "today - 1 year" timestamp. That makes the
+// cumulative curve step vertically. We spread same-timestamp clusters
+// uniformly into the gap between the previous and next unique timestamps.
+function spreadClusteredTimes(reviews) {
+  const out = reviews.map(r => ({ ...r, _t: new Date(r.date).getTime() }));
+  const n = out.length;
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j < n && out[j]._t === out[i]._t) j++;
+    if (j - i > 1) {
+      const prev = i > 0 ? out[i - 1]._t : null;
+      const next = j < n ? out[j]._t : null;
+      let lo, hi;
+      if (prev != null && next != null) { lo = (prev + out[i]._t) / 2; hi = (next + out[i]._t) / 2; }
+      else if (prev != null) { lo = (prev + out[i]._t) / 2; hi = out[i]._t + (out[i]._t - prev) / 4; }
+      else if (next != null) { lo = out[i]._t - (next - out[i]._t) / 4; hi = (next + out[i]._t) / 2; }
+      else { lo = out[i]._t - 86400000; hi = out[i]._t + 86400000; }
+      const span = hi - lo;
+      for (let k = i; k < j; k++) {
+        out[k]._t = lo + span * (k - i + 0.5) / (j - i);
+      }
+    }
+    i = j;
+  }
+  return out;
+}
+
+const DAY = 86400000;
+const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function avgRatingOf(arr) {
+  if (!arr.length) return 0;
+  return arr.reduce((a, x) => a + x.stars, 0) / arr.length;
+}
+
 function stats() {
   const r = state.reviews || [];
   const total = r.length;
   const dist = [0, 0, 0, 0, 0];
-  let likes = 0, withText = 0, withResp = 0;
+  let likes = 0, withText = 0, withResp = 0, textCharSum = 0;
+  let withRespCrit = 0, critTotal = 0, posTotal = 0;
   const langs = {};
+  const dowCounts = [0,0,0,0,0,0,0];
+  const dowStars = [0,0,0,0,0,0,0];
   for (const x of r) {
     dist[x.stars - 1] = (dist[x.stars - 1] || 0) + 1;
     likes += x.likes;
-    if (x.text) withText++;
+    if (x.text) { withText++; textCharSum += x.text.length; }
     if (x.hasResponse) withResp++;
+    if (x.stars <= 2) { critTotal++; if (x.hasResponse) withRespCrit++; }
+    if (x.stars >= 4) posTotal++;
     if (x.lang) langs[x.lang] = (langs[x.lang] || 0) + 1;
+    const t = new Date(x.date);
+    if (!isNaN(t)) {
+      const d = t.getDay();
+      dowCounts[d]++;
+      dowStars[d] += x.stars;
+    }
   }
   const sumStars = r.reduce((a, x) => a + x.stars, 0);
   const avg = total ? sumStars / total : 0;
-  const times = r.map(x => new Date(x.date).getTime()).filter(t => !isNaN(t));
-  const earliest = times.length ? Math.min(...times) : null;
-  const latest = times.length ? Math.max(...times) : null;
+  const times = r.map(x => new Date(x.date).getTime()).filter(t => !isNaN(t)).sort((a, b) => a - b);
+  const earliest = times.length ? times[0] : null;
+  const latest = times.length ? times[times.length - 1] : null;
   const now = Date.now();
-  const inLast = days => times.filter(t => now - t <= days * 86400000).length;
-  return { total, dist, likes, withText, withResp, langs, avg, earliest, latest,
-           last30: inLast(30), last90: inLast(90), last365: inLast(365) };
+  const inLast = days => times.filter(t => now - t <= days * DAY).length;
+
+  // Most-recent and most-recent-critical
+  const sorted = r.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+  const lastReview = sorted[0] || null;
+  const lastCritical = sorted.find(x => x.stars <= 2) || null;
+  const daysSinceLast = lastReview
+    ? Math.floor((now - new Date(lastReview.date).getTime()) / DAY) : null;
+  const daysSinceLastCrit = lastCritical
+    ? Math.floor((now - new Date(lastCritical.date).getTime()) / DAY) : null;
+  const lastCriticalDate = lastCritical ? new Date(lastCritical.date).getTime() : null;
+
+  // 12-month trend: current trailing-12mo avg vs prior 12mo avg.
+  const last12start = now - 365 * DAY;
+  const prev12start = now - 730 * DAY;
+  const last12 = r.filter(x => {
+    const t = new Date(x.date).getTime();
+    return t >= last12start && t <= now;
+  });
+  const prev12 = r.filter(x => {
+    const t = new Date(x.date).getTime();
+    return t >= prev12start && t < last12start;
+  });
+  const last12avg = avgRatingOf(last12);
+  const prev12avg = avgRatingOf(prev12);
+  const trendDelta = prev12.length && last12.length ? last12avg - prev12avg : null;
+
+  // YoY review volume (this YTD vs prior YTD at same month/day).
+  const nowD = new Date();
+  const ytdStart = new Date(nowD.getFullYear(), 0, 1).getTime();
+  const lastYearYtdStart = new Date(nowD.getFullYear() - 1, 0, 1).getTime();
+  const lastYearYtdEnd = new Date(nowD.getFullYear() - 1, nowD.getMonth(), nowD.getDate(), 23, 59, 59).getTime();
+  const ytdCount = times.filter(t => t >= ytdStart && t <= now).length;
+  const lastYearCount = times.filter(t => t >= lastYearYtdStart && t <= lastYearYtdEnd).length;
+
+  // Best/worst year by count.
+  const byYear = {};
+  for (const t of times) {
+    const y = new Date(t).getFullYear();
+    byYear[y] = (byYear[y] || 0) + 1;
+  }
+  const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+  const bestYear = years.reduce((b, y) => byYear[y] > (byYear[b] || 0) ? y : b, years[0]);
+  const worstYear = years.reduce((w, y) => byYear[y] < (byYear[w] || Infinity) ? y : w, years[0]);
+
+  // Longest 5★ streak (consecutive 5★ reviews in chronological order).
+  let bestStreak = 0, curStreak = 0;
+  for (const x of r) {
+    if (x.stars === 5) { curStreak++; if (curStreak > bestStreak) bestStreak = curStreak; }
+    else curStreak = 0;
+  }
+
+  // Longest quiet gap between consecutive reviews (in days).
+  let longestGap = 0, longestGapStart = null, longestGapEnd = null;
+  for (let k = 1; k < times.length; k++) {
+    const gap = times[k] - times[k - 1];
+    if (gap > longestGap) {
+      longestGap = gap;
+      longestGapStart = times[k - 1];
+      longestGapEnd = times[k];
+    }
+  }
+
+  // Bayesian-smoothed score: pulls low-N scores toward a global mean.
+  // Prior of 50 reviews at a 4.0 industry midpoint — gentle, just enough
+  // to make tiny samples honest without distorting our 195-review case.
+  const PRIOR_N = 50, PRIOR_MEAN = 4.0;
+  const bayes = total ? (sumStars + PRIOR_N * PRIOR_MEAN) / (total + PRIOR_N) : 0;
+
+  return {
+    total, dist, likes, withText, withResp, withRespCrit, critTotal, posTotal,
+    textCharSum, langs, avg,
+    earliest, latest, last30: inLast(30), last90: inLast(90), last365: inLast(365),
+    daysSinceLast, daysSinceLastCrit, lastCriticalDate,
+    last12avg, prev12avg, trendDelta, last12n: last12.length, prev12n: prev12.length,
+    ytdCount, lastYearCount,
+    bestYear, bestYearCount: byYear[bestYear] || 0,
+    worstYear, worstYearCount: byYear[worstYear] || 0,
+    bestStreak,
+    longestGapDays: Math.round(longestGap / DAY),
+    longestGapStart, longestGapEnd,
+    bayes,
+    dowCounts, dowStars,
+  };
 }
 
 /* ============================== Render =============================== */
@@ -382,22 +543,101 @@ function render() {
     ? `${Math.round((s.latest - s.earliest) / (365.25 * 86400000) * 10) / 10} years`
     : '';
 
+  // Row 2: positive/critical/recency/Bayesian/trend
+  const posPct = s.total ? (100 * s.posTotal / s.total) : 0;
+  const critPct = s.total ? (100 * s.critTotal / s.total) : 0;
+  $('#s-pos').textContent = posPct.toFixed(1) + '%';
+  $('#s-pos-sub').textContent = `${fmt(s.posTotal)} of ${fmt(s.total)}`;
+  $('#s-crit').textContent = critPct.toFixed(1) + '%';
+  $('#s-crit-sub').textContent = `${fmt(s.critTotal)} of ${fmt(s.total)}`;
+  $('#s-since').textContent = s.daysSinceLast == null ? '—' : `${fmt(s.daysSinceLast)} d`;
+  $('#s-since-sub').textContent = s.daysSinceLast == null ? ''
+    : new Date(s.latest).toLocaleDateString();
+  $('#s-since-crit').textContent = s.daysSinceLastCrit == null
+    ? 'never' : `${fmt(s.daysSinceLastCrit)} d`;
+  $('#s-since-crit-sub').textContent = s.daysSinceLastCrit == null ? 'no 1–2★ reviews on file'
+    : `last 1-2★: ${new Date(s.lastCriticalDate).toLocaleDateString()}`;
+  $('#s-bayes').textContent = s.bayes ? s.bayes.toFixed(2) + ' ★' : '—';
+  $('#s-bayes-sub').textContent = 'smoothed for sample size';
+  if (s.trendDelta != null) {
+    const arrow = s.trendDelta > 0 ? '▲' : (s.trendDelta < 0 ? '▼' : '→');
+    const sign = s.trendDelta > 0 ? '+' : '';
+    $('#s-trend').textContent = `${arrow} ${sign}${s.trendDelta.toFixed(2)}`;
+    $('#s-trend-sub').textContent = `${s.last12avg.toFixed(2)}★ now vs ${s.prev12avg.toFixed(2)}★ prior 12mo`;
+  } else {
+    $('#s-trend').textContent = '—';
+    $('#s-trend-sub').textContent = 'not enough history in both windows';
+  }
+
+  // Engagement (now 6 cards).
   $('#e-text').textContent = fmt(s.withText);
   $('#e-text-sub').textContent = `${Math.round(100 * s.withText / s.total)}% of total`;
   $('#e-resp').textContent = fmt(s.withResp);
   $('#e-resp-sub').textContent = `${Math.round(100 * s.withResp / s.total)}% answered`;
+  $('#e-resp-crit').textContent = s.critTotal ? `${Math.round(100 * s.withRespCrit / s.critTotal)}%` : '—';
+  $('#e-resp-crit-sub').textContent = `${fmt(s.withRespCrit)} of ${fmt(s.critTotal)} 1-2★ reviews`;
+  $('#e-text-len').textContent = s.withText ? `${Math.round(s.textCharSum / s.withText)}` : '—';
+  $('#e-text-len-sub').textContent = 'avg chars per written review';
   $('#e-likes').textContent = fmt(s.likes);
   $('#e-likes-sub').textContent = s.likes ? `${(s.likes / s.total).toFixed(2)} per review` : '';
   const langEntries = Object.entries(s.langs).sort((a, b) => b[1] - a[1]);
   $('#e-lang').textContent = langEntries.length ? langEntries[0][0] : '—';
   $('#e-lang-sub').textContent = langEntries.map(([k, v]) => `${k}: ${v}`).join(', ');
 
+  // Patterns
+  if (s.lastYearCount > 0) {
+    const yoy = ((s.ytdCount - s.lastYearCount) / s.lastYearCount) * 100;
+    const arrow = yoy > 0 ? '▲' : (yoy < 0 ? '▼' : '→');
+    const sign = yoy > 0 ? '+' : '';
+    $('#p-yoy').textContent = `${arrow} ${sign}${yoy.toFixed(0)}%`;
+    $('#p-yoy-sub').textContent = `${fmt(s.ytdCount)} YTD vs ${fmt(s.lastYearCount)} same window last year`;
+  } else if (s.ytdCount > 0) {
+    $('#p-yoy').textContent = '+' + fmt(s.ytdCount);
+    $('#p-yoy-sub').textContent = 'first comparable year';
+  } else {
+    $('#p-yoy').textContent = '—';
+    $('#p-yoy-sub').textContent = '';
+  }
+  $('#p-best').textContent = s.bestYear || '—';
+  $('#p-best-sub').textContent = s.bestYear ? `${fmt(s.bestYearCount)} reviews` : '';
+  $('#p-streak').textContent = fmt(s.bestStreak);
+  $('#p-streak-sub').textContent = 'consecutive 5★ reviews';
+  if (s.longestGapDays > 0) {
+    $('#p-gap').textContent = `${fmt(s.longestGapDays)} d`;
+    const gs = new Date(s.longestGapStart).toLocaleDateString();
+    const ge = new Date(s.longestGapEnd).toLocaleDateString();
+    $('#p-gap-sub').textContent = `${gs} → ${ge}`;
+  } else {
+    $('#p-gap').textContent = '—'; $('#p-gap-sub').textContent = '';
+  }
+  renderDow(s);
+
   renderDistribution(s);
   renderCumulative();
+  renderVelocity();
   renderPerYear();
   renderRatingOverTime();
   renderTopReviewers();
   renderRecent();
+}
+
+function renderDow(s) {
+  const tbody = $('#dow-table tbody');
+  tbody.innerHTML = '';
+  const total = s.dowCounts.reduce((a, b) => a + b, 0) || 1;
+  // Render Mon → Sun for readability.
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  for (const d of order) {
+    const c = s.dowCounts[d];
+    const avg = c ? (s.dowStars[d] / c) : null;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${DOW_NAMES[d]}</td>` +
+      `<td class="num">${fmt(c)}</td>` +
+      `<td class="num">${((c / total) * 100).toFixed(1)}%</td>` +
+      `<td class="num">${avg != null ? avg.toFixed(2) + '★' : '—'}</td>`;
+    tbody.appendChild(tr);
+  }
 }
 
 function renderDistribution(s) {
@@ -486,17 +726,20 @@ function renderCumulative() {
   const r = state.reviews;
   if (!r.length) return;
 
-  const minT = new Date(r[0].date).getTime();
+  // Spread same-timestamp clusters so the curve is smooth.
+  const spread = spreadClusteredTimes(r);
+
+  const minT = spread[0]._t;
   const now = Date.now();
-  const maxT = Math.max(now, new Date(r[r.length - 1].date).getTime());
-  const maxC = r.length;
+  const maxT = Math.max(now, spread[spread.length - 1]._t);
+  const maxC = spread.length;
   const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
   const yOf = c => f.padT + (1 - c / maxC) * (f.H - f.padT - f.padB);
 
   drawYGrid(svg, f, maxC, v => Math.round(v));
   drawYearTicks(svg, f, minT, maxT, xOf);
 
-  const path = r.map((x, i) => ({ x: xOf(new Date(x.date).getTime()), y: yOf(i + 1) }));
+  const path = spread.map((x, i) => ({ x: xOf(x._t), y: yOf(i + 1) }));
   path.push({ x: xOf(now), y: yOf(maxC) });
 
   const fill = document.createElementNS(ns, 'path');
@@ -514,9 +757,9 @@ function renderCumulative() {
   svg.appendChild(line);
 
   const colors = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
-  r.forEach((x, i) => {
+  spread.forEach((x, i) => {
     const c = document.createElementNS(ns, 'circle');
-    c.setAttribute('cx', xOf(new Date(x.date).getTime()));
+    c.setAttribute('cx', xOf(x._t));
     c.setAttribute('cy', yOf(i + 1));
     c.setAttribute('r', '2.4');
     c.setAttribute('fill', colors[x.stars]);
@@ -537,7 +780,68 @@ function renderCumulative() {
   const note = document.createElement('div');
   note.className = 'key muted';
   note.style.marginLeft = 'auto';
-  note.textContent = `${r.length} reviews, exact dates from JSON`;
+  note.textContent = `${r.length} reviews, same-day clusters spread for smoothness`;
+  legend.appendChild(note);
+}
+
+function renderVelocity() {
+  const svg = $('#chart-velocity');
+  const legend = $('#legend-velocity');
+  const f = chartFrame(svg);
+  legend.innerHTML = '';
+  const r = state.reviews;
+  if (r.length < 3) return;
+
+  const minT = new Date(r[0].date).getTime();
+  const now = Date.now();
+  const maxT = Math.max(now, new Date(r[r.length - 1].date).getTime());
+
+  // Sample monthly; each sample is the 90-day trailing count scaled to /month.
+  const start = new Date(minT);
+  start.setDate(1); start.setHours(0, 0, 0, 0);
+  const samples = [];
+  for (let m = new Date(start); m.getTime() <= maxT; m.setMonth(m.getMonth() + 1)) {
+    const end = m.getTime();
+    const wStart = end - 90 * DAY;
+    const count = r.reduce((acc, x) => {
+      const t = new Date(x.date).getTime();
+      return acc + (t > wStart && t <= end ? 1 : 0);
+    }, 0);
+    samples.push({ t: end, rate: count / 3 }); // 90-day count → per-month
+  }
+  if (!samples.length) return;
+
+  const maxRate = Math.max(1, ...samples.map(s => s.rate));
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yOf = v => f.padT + (1 - v / maxRate) * (f.H - f.padT - f.padB);
+
+  drawYGrid(svg, f, maxRate, v => v >= 10 ? Math.round(v) : v.toFixed(1));
+  drawYearTicks(svg, f, minT, maxT, xOf);
+
+  const path = samples.map(s => ({ x: xOf(s.t), y: yOf(s.rate) }));
+  const fill = document.createElementNS(ns, 'path');
+  fill.setAttribute('d', smoothPath(path) +
+    ` L${(f.W - f.padR).toFixed(2)},${(f.H - f.padB).toFixed(2)} L${f.padL.toFixed(2)},${(f.H - f.padB).toFixed(2)} Z`);
+  fill.setAttribute('fill', '#2ecc71'); fill.setAttribute('fill-opacity', '0.12');
+  svg.appendChild(fill);
+
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('d', smoothPath(path));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', '#2ecc71');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(line);
+
+  const last = samples[samples.length - 1];
+  const k = document.createElement('div');
+  k.className = 'key';
+  k.innerHTML = `<span class="swatch" style="background:#2ecc71"></span>90-day rolling rate (reviews/month)`;
+  legend.appendChild(k);
+  const note = document.createElement('div');
+  note.className = 'key muted';
+  note.style.marginLeft = 'auto';
+  note.textContent = `peak: ${maxRate.toFixed(1)}/mo  ·  current: ${last.rate.toFixed(1)}/mo`;
   legend.appendChild(note);
 }
 
