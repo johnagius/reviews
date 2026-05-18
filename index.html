@@ -233,7 +233,7 @@
               <div class="grid three" id="podium-count"></div>
             </div>
             <div>
-              <h2>Podium — by Bayesian rating</h2>
+              <h2>Podium — by Bayesian rating <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal" title="Bayesian smoothing pulls every pharmacy's average toward a prior of 4.00★ across 50 phantom reviews. It dampens swings at small sample sizes and shrinks gaps vs. raw averages — that's why overtaking takes more 5★ reviews than the raw difference might suggest.">(?)</span></h2>
               <div class="grid three" id="podium-bayes"></div>
             </div>
           </div>
@@ -1195,6 +1195,16 @@ function renderPodium(visible, allStats) {
   const PRIOR_N = 50, PRIOR_MEAN = 4.0;
   const myRate = rate90(state.reviews);  // per-day
 
+  // Average stars of reviews in the last N days (null if window has none).
+  function avgLastN(reviews, days) {
+    const cutoff = Date.now() - days * DAY;
+    let sum = 0, n = 0;
+    for (const r of reviews) {
+      if (new Date(r.date).getTime() >= cutoff) { sum += r.stars; n++; }
+    }
+    return n ? sum / n : null;
+  }
+
   // How many "all-5★" reviews do I need to leapfrog a competitor's Bayesian?
   // Same Bayesian formula as the rating-goal calculator, solved for N.
   function fiveStarsToOvertakeBayes(myS, targetBayes) {
@@ -1202,6 +1212,15 @@ function renderPodium(visible, allStats) {
     if (tgt >= 5) return Infinity;
     const sumStars = myS.avg * myS.total;
     const N = (tgt * (myS.total + PRIOR_N) - sumStars - PRIOR_N * PRIOR_MEAN) / (5 - tgt);
+    return Math.max(0, Math.ceil(N));
+  }
+  // How many reviews-at-mix-rating-M do I need to leapfrog? Returns null if
+  // M <= target (mathematically impossible — they'd never close the gap).
+  function reviewsAtMixToOvertakeBayes(myS, targetBayes, mixAvg) {
+    const tgt = targetBayes + 0.005;
+    if (tgt >= 5 || !Number.isFinite(mixAvg) || mixAvg <= tgt) return null;
+    const sumStars = myS.avg * myS.total;
+    const N = (tgt * (myS.total + PRIOR_N) - sumStars - PRIOR_N * PRIOR_MEAN) / (mixAvg - tgt);
     return Math.max(0, Math.ceil(N));
   }
   function countToOvertake(myS, targetCount) {
@@ -1228,9 +1247,11 @@ function renderPodium(visible, allStats) {
         : `${s.bayes.toFixed(2)}★ Bayesian · ${s.avg.toFixed(2)}★ raw`;
 
       // On the user's own card, when not 1st, list each ranked-above
-      // competitor with the lift needed to leapfrog them.
+      // competitor with the lift needed to leapfrog them. Show both
+      // best-case (all 5★) and realistic (at last-90-day rating mix).
       let climbHtml = '';
       if (p.isMine && i > 0) {
+        const last90Avg = avgLastN(state.reviews, 90);
         const lines = [];
         for (let j = 0; j < i; j++) {
           const t = sorted[j];
@@ -1242,19 +1263,27 @@ function renderPodium(visible, allStats) {
               : '';
             lines.push(`To pass <b>${escapeHtml(t.p.name)}</b>: <b>+${fmt(need)}</b> reviews${eta}`);
           } else {
-            const need = fiveStarsToOvertakeBayes(s, t.s.bayes);
-            if (!Number.isFinite(need)) {
-              lines.push(`To pass <b>${escapeHtml(t.p.name)}</b>: unreachable (their Bayesian is already at the 5★ ceiling).`);
+            const need5 = fiveStarsToOvertakeBayes(s, t.s.bayes);
+            if (!Number.isFinite(need5)) {
+              lines.push(`To pass <b>${escapeHtml(t.p.name)}</b>: unreachable (their Bayesian sits at the 5★ ceiling).`);
             } else {
-              const future5pct = ((s.dist[4] + need) / (s.total + need) * 100).toFixed(0);
-              const etaDays = myRate > 0 ? need / myRate : null;
-              const eta = etaDays != null
-                ? ` <span class="muted">(~${formatDuration(etaDays)} if every new review is 5★)</span>`
-                : '';
-              lines.push(
-                `To pass <b>${escapeHtml(t.p.name)}</b> (${t.s.bayes.toFixed(2)}★): ` +
-                `<b>+${fmt(need)} × 5★</b> — your 5★ share would climb to <b>${future5pct}%</b>${eta}`
-              );
+              const future5pct = ((s.dist[4] + need5) / (s.total + need5) * 100).toFixed(0);
+              const etaDays5 = myRate > 0 ? need5 / myRate : null;
+              const etaPart = etaDays5 != null ? ` <span class="muted">(~${formatDuration(etaDays5)} at current pace)</span>` : '';
+              let line =
+                `To pass <b>${escapeHtml(t.p.name)}</b> (${t.s.bayes.toFixed(2)}★)` +
+                `<br>&nbsp;&nbsp;Best case (all 5★): <b>+${fmt(need5)} × 5★</b> — your 5★ share would climb ${(s.dist[4]/s.total*100).toFixed(0)}% → <b>${future5pct}%</b>${etaPart}`;
+              const needMix = reviewsAtMixToOvertakeBayes(s, t.s.bayes, last90Avg);
+              if (last90Avg != null) {
+                if (needMix == null) {
+                  line += `<br>&nbsp;&nbsp;At your last-90-day mix (${last90Avg.toFixed(2)}★ avg): can't catch them — incoming reviews would need to average above <b>${t.s.bayes.toFixed(2)}★</b>.`;
+                } else {
+                  const etaDaysMix = myRate > 0 ? needMix / myRate : null;
+                  const etaMix = etaDaysMix != null ? ` <span class="muted">(~${formatDuration(etaDaysMix)})</span>` : '';
+                  line += `<br>&nbsp;&nbsp;At your last-90-day mix (${last90Avg.toFixed(2)}★ avg): <b>+${fmt(needMix)}</b> reviews${etaMix}`;
+                }
+              }
+              lines.push(line);
             }
           }
         }
