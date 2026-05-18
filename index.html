@@ -114,6 +114,36 @@
   .chip:hover { border-color: var(--accent); }
   .chip.off { opacity: 0.35; text-decoration: line-through; }
   .chip-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  /* Headline digest + what's-new */
+  .headline { border-left: 3px solid var(--accent); background: rgba(79,140,255,.06); }
+  .headline .htext { font-size: 14px; line-height: 1.55; }
+  .headline .hmeta { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  #whatsnew-section { border-left: 3px solid var(--home); background: rgba(255,209,102,.04); }
+
+  /* Card-state border accents (ETA, velocity strip, podium) */
+  .stat.threat { border-left: 3px solid var(--bad); }
+  .stat.safe   { border-left: 3px solid var(--good); }
+  .stat.steady { border-left: 3px solid var(--line); }
+  .stat.podium-1 { border-left: 3px solid #ffd166; }
+  .stat.podium-2 { border-left: 3px solid #c0c5cf; }
+  .stat.podium-3 { border-left: 3px solid #cd7f32; }
+  .stat.mine-glow { box-shadow: 0 0 0 2px var(--home); }
+
+  /* Acceleration chip inline within velocity strip cards */
+  .accel-chip { display: inline-block; padding: 1px 8px; border-radius: 10px;
+    font-size: 11px; border: 1px solid var(--line); }
+  .accel-chip.up { color: var(--good); border-color: var(--good); }
+  .accel-chip.down { color: var(--bad); border-color: var(--bad); }
+  .accel-chip.steady { color: var(--muted); }
+
+  /* Goal tracker progress bars */
+  .goal-bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin: 8px 0 6px; }
+  .goal-bar > div { height: 100%; border-radius: 4px; }
+
+  /* Streak pulse for high current 5★ streaks */
+  @keyframes streakPulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+  .streak-pulse { animation: streakPulse 2.4s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -130,6 +160,19 @@
 </header>
 
 <main>
+
+  <section id="headline-section" class="headline" style="display:none">
+    <h2 style="color:var(--accent)">Headline</h2>
+    <div class="htext" id="headline-text">—</div>
+    <div class="hmeta" id="headline-meta"></div>
+  </section>
+
+  <section id="whatsnew-section" style="display:none">
+    <h2 style="color:var(--home)">What's changed since your last visit
+      <span class="muted small" id="whatsnew-since" style="text-transform:none; letter-spacing:0; font-weight:normal"></span>
+    </h2>
+    <div id="whatsnew-list"></div>
+  </section>
 
   <section id="setup-banner" class="setup" style="display:none">
     <h2>Get started — import your Google reviews JSON</h2>
@@ -163,6 +206,12 @@
       <div class="stat"><div class="label">12-mo trend</div><div class="value" style="font-size:18px" id="s-trend">—</div><div class="sub" id="s-trend-sub"></div></div>
     </div>
 
+    <div class="grid three" style="margin-bottom:14px">
+      <div class="stat"><div class="label">Current 5★ streak</div><div class="value" id="s-cur-streak">—</div><div class="sub" id="s-cur-streak-sub"></div></div>
+      <div class="stat"><div class="label">Days without 1-2★</div><div class="value" id="s-clean-days">—</div><div class="sub" id="s-clean-days-sub"></div></div>
+      <div class="stat"><div class="label">Pace vs prior 90d</div><div class="value" style="font-size:18px" id="s-pace">—</div><div class="sub" id="s-pace-sub"></div></div>
+    </div>
+
     <section>
       <h2>Mid-2024 pivot <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(growth before vs after July 1, 2024)</span></h2>
       <div class="grid two" id="pivot-cards"></div>
@@ -176,6 +225,27 @@
       </div>
       <div id="competitors-wrap" style="display:none">
         <div class="row" id="compare-toggles" style="margin-bottom:10px"></div>
+
+        <div id="podium-section">
+          <div class="grid two">
+            <div>
+              <h2>Podium — by review count</h2>
+              <div class="grid three" id="podium-count"></div>
+            </div>
+            <div>
+              <h2>Podium — by Bayesian rating</h2>
+              <div class="grid three" id="podium-bayes"></div>
+            </div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:16px">At current rates — who's catching up</h2>
+        <div class="grid three" id="overtake-cards"></div>
+
+        <h2 style="margin-top:16px">Velocity vs ours <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(90-day rate · with acceleration over last 30d)</span></h2>
+        <div class="grid three" id="velocity-ratio-strip"></div>
+
+        <h2 style="margin-top:16px">Comparison table</h2>
         <table id="compare-table">
           <thead><tr>
             <th>Pharmacy</th>
@@ -194,6 +264,10 @@
         <h2 style="margin-top:16px">Cumulative reviews — all pharmacies</h2>
         <svg class="chart" id="chart-compare-cum" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
         <div class="legend" id="legend-compare-cum"></div>
+
+        <h2 style="margin-top:16px">Lead / gap over time <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(my count − competitor count; above 0 = lead, widening = pulling away)</span></h2>
+        <svg class="chart" id="chart-compare-gap" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        <div class="legend" id="legend-compare-gap"></div>
 
         <h2 style="margin-top:16px">Review velocity — all pharmacies <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(rolling 90-day rate, reviews per month)</span></h2>
         <svg class="chart" id="chart-compare-vel" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
@@ -301,6 +375,32 @@
       <div class="grid two" id="recent-reviews"></div>
     </section>
 
+    <section id="goal-tracker">
+      <h2>Goals</h2>
+      <div class="grid two">
+        <div class="stat">
+          <div class="label">Review count goal</div>
+          <div class="row" style="margin: 6px 0 4px">
+            <input id="goal-count-input" type="number" min="1" step="1" placeholder="e.g. 300" style="width:120px">
+            <button id="goal-count-save">Save</button>
+            <button id="goal-count-clear" class="danger">Clear</button>
+          </div>
+          <div class="goal-bar"><div id="goal-count-bar" style="width:0%; background:var(--accent)"></div></div>
+          <div class="sub" id="goal-count-sub">Set a target review count to see progress and ETA.</div>
+        </div>
+        <div class="stat">
+          <div class="label">Bayesian rating goal</div>
+          <div class="row" style="margin: 6px 0 4px">
+            <input id="goal-rating-input" type="number" min="1" max="5" step="0.01" placeholder="e.g. 4.70" style="width:120px">
+            <button id="goal-rating-save">Save</button>
+            <button id="goal-rating-clear" class="danger">Clear</button>
+          </div>
+          <div class="goal-bar"><div id="goal-rating-bar" style="width:0%; background:var(--warn)"></div></div>
+          <div class="sub" id="goal-rating-sub">Set a target Bayesian-smoothed rating to see how many 5★ reviews you need and an ETA.</div>
+        </div>
+      </div>
+    </section>
+
     <section>
       <h2>How long to reach N more reviews</h2>
       <div class="row" style="margin-bottom:8px">
@@ -373,6 +473,8 @@ function load() {
       if (!Array.isArray(s.hidden)) s.hidden = [];
       if (typeof s.milestoneFilter !== 'string') s.milestoneFilter = 'all';
       if (typeof s.milestoneScope !== 'string') s.milestoneScope = 'all';
+      if (typeof s.lastViewedAt !== 'string' && s.lastViewedAt !== null) s.lastViewedAt = null;
+      if (!s.goals || typeof s.goals !== 'object') s.goals = { count: null, rating: null };
       return s;
     }
     // Migrate v3 (single-pharmacy) into v4 (own + competitors).
@@ -386,14 +488,22 @@ function load() {
         reviews: v3.reviews || [],
         competitors: [],
         hidden: [],
+        milestoneFilter: 'all',
+        milestoneScope: 'all',
+        lastViewedAt: null,
+        goals: { count: null, rating: null },
       };
     }
   } catch (e) {}
   return { pharmacyName: '', placeId: '', importedAt: null, reviews: [],
-           competitors: [], hidden: [], milestoneFilter: 'all', milestoneScope: 'all' };
+           competitors: [], hidden: [], milestoneFilter: 'all', milestoneScope: 'all',
+           lastViewedAt: null, goals: { count: null, rating: null } };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 const state = load();
+// Capture once at script load — used by renderWhatsNew so the section
+// doesn't empty itself on the second render after import.
+const previousLastViewedAt = state.lastViewedAt;
 
 function toast(msg, kind='') {
   const t = document.createElement('div');
@@ -408,6 +518,30 @@ function fmt(n, digits=0) {
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function nowISO() { return new Date().toISOString(); }
+
+// Per-day rate helpers — sugar over existing stats fields; used by
+// ETA-to-overtake, velocity strip, trajectory projection, etc.
+function rate90(reviews) {
+  if (!reviews || !reviews.length) return 0;
+  const cutoff = Date.now() - 90 * 86400000;
+  let n = 0;
+  for (const r of reviews) if (new Date(r.date).getTime() >= cutoff) n++;
+  return n / 90;
+}
+function rate30(reviews) {
+  if (!reviews || !reviews.length) return 0;
+  const cutoff = Date.now() - 30 * 86400000;
+  let n = 0;
+  for (const r of reviews) if (new Date(r.date).getTime() >= cutoff) n++;
+  return n / 30;
+}
+function formatDuration(days) {
+  if (!Number.isFinite(days) || days < 0) return 'unknown';
+  if (days < 28) return `~${(days / 7).toFixed(1)} weeks`;
+  if (days < 365) return `~${(days / 30.44).toFixed(1)} months`;
+  return `~${(days / 365.25).toFixed(1)} years`;
 }
 
 /* ============================== Import =============================== */
@@ -641,6 +775,18 @@ function stats(reviewsArg) {
     else curStreak = 0;
   }
 
+  // Current 5★ streak — walk newest→oldest, stop at first non-5★.
+  let currentFiveStarStreak = 0;
+  for (let k = r.length - 1; k >= 0; k--) {
+    if (r[k].stars === 5) currentFiveStarStreak++;
+    else break;
+  }
+
+  // Days without a 1-2★ review. If none on file, span since earliest review.
+  const daysWithoutCritical = daysSinceLastCrit != null
+    ? daysSinceLastCrit
+    : (earliest ? Math.floor((now - earliest) / DAY) : 0);
+
   // Longest quiet gap between consecutive reviews (in days).
   let longestGap = 0, longestGapStart = null, longestGapEnd = null;
   for (let k = 1; k < times.length; k++) {
@@ -689,6 +835,8 @@ function stats(reviewsArg) {
     bestYear, bestYearCount: byYear[bestYear] || 0,
     worstYear, worstYearCount: byYear[worstYear] || 0,
     bestStreak,
+    currentFiveStarStreak,
+    daysWithoutCritical,
     longestGapDays: Math.round(longestGap / DAY),
     longestGapStart, longestGapEnd,
     bayes,
@@ -708,7 +856,11 @@ function render() {
   $('#imported-line').textContent = state.importedAt
     ? `Imported ${new Date(state.importedAt).toLocaleString()} — ${state.reviews.length} reviews`
     : 'No data imported yet';
-  if (!has) return;
+  if (!has) {
+    $('#headline-section').style.display = 'none';
+    $('#whatsnew-section').style.display = 'none';
+    return;
+  }
 
   const s = stats();
   $('#s-name').textContent = state.pharmacyName || '—';
@@ -796,8 +948,46 @@ function render() {
   }
   renderDow(s);
 
+  // Row 3: current streak / days without critical / pace
+  $('#s-cur-streak').textContent = fmt(s.currentFiveStarStreak);
+  if (s.currentFiveStarStreak >= 20) $('#s-cur-streak').classList.add('streak-pulse');
+  else $('#s-cur-streak').classList.remove('streak-pulse');
+  const lastStars = state.reviews.length ? state.reviews[state.reviews.length - 1].stars : 0;
+  $('#s-cur-streak-sub').textContent = !state.reviews.length ? '' :
+    (lastStars === 5 ? 'and counting' : `last was ${lastStars}★ — streak reset`);
+  $('#s-clean-days').textContent = `${fmt(s.daysWithoutCritical)} d`;
+  $('#s-clean-days-sub').textContent = s.daysSinceLastCrit != null
+    ? `since last 1-2★ on ${new Date(s.lastCriticalDate).toLocaleDateString()}`
+    : 'no 1-2★ reviews on file';
+  // Pace vs prior 90d.
+  const last90n = s.last90;
+  const prior90Start = Date.now() - 180 * DAY;
+  const prior90End = Date.now() - 90 * DAY;
+  const prior90n = state.reviews.filter(r => {
+    const t = new Date(r.date).getTime();
+    return t >= prior90Start && t < prior90End;
+  }).length;
+  if (last90n > 0 || prior90n > 0) {
+    const diff = last90n - prior90n;
+    const arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '→');
+    const sign = diff > 0 ? '+' : '';
+    $('#s-pace').textContent = `${arrow} ${sign}${diff}`;
+    $('#s-pace-sub').textContent = `${fmt(last90n)} last 90d vs ${fmt(prior90n)} prior 90d`;
+  } else {
+    $('#s-pace').textContent = '—';
+    $('#s-pace-sub').textContent = 'no recent activity';
+  }
+
+  // Pre-compute pharmacies + allStats once, share with everything below.
+  const pharmacies = comparedPharmacies();
+  pharmacies.forEach((p, i) => { p.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]; });
+  const allStats = pharmacies.map(p => ({ p, s: stats(p.reviews) }));
+  const events = pharmacies.length >= 2 ? buildMilestones(pharmacies) : [];
+
+  renderHeadline(s, pharmacies, allStats, events);
+  renderWhatsNew(previousLastViewedAt, events);
   renderPivot(s);
-  renderCompare();
+  renderCompare(pharmacies, allStats, events);
   renderDistribution(s);
   renderCumulative();
   renderVelocity();
@@ -805,6 +995,11 @@ function render() {
   renderRatingOverTime();
   renderTopReviewers();
   renderRecent();
+  renderGoals(s);
+
+  // Bump lastViewedAt at end of render so the next visit sees deltas.
+  state.lastViewedAt = nowISO();
+  save();
 }
 
 /* ====================== Competitor comparison ======================== */
@@ -824,7 +1019,7 @@ function comparedPharmacies() {
   return arr;
 }
 
-function renderCompare() {
+function renderCompare(pharmaciesArg, allStatsArg, eventsArg) {
   const wrap = $('#competitors-wrap');
   const empty = $('#competitors-empty');
   const comps = state.competitors || [];
@@ -836,11 +1031,13 @@ function renderCompare() {
   wrap.style.display = '';
   empty.style.display = 'none';
 
-  const pharmacies = comparedPharmacies();
-
-  // Stable color per pharmacy by index in the full list (so toggling
-  // visibility doesn't shuffle colors around).
-  pharmacies.forEach((p, i) => { p.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]; });
+  // Accept pre-computed pharmacies + allStats + events from render(); when
+  // called bare (e.g. from a chip click) recompute them locally.
+  const pharmacies = pharmaciesArg || (() => {
+    const p = comparedPharmacies();
+    p.forEach((x, i) => { x.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]; });
+    return p;
+  })();
 
   const hidden = new Set(state.hidden || []);
   const visible = pharmacies.filter(p => !hidden.has(p.placeId));
@@ -859,13 +1056,13 @@ function renderCompare() {
       else next.add(p.placeId);
       state.hidden = Array.from(next);
       save();
-      renderCompare();
+      render();  // full re-render so headline + what's-new also respect new visibility
     };
     togglesEl.appendChild(chip);
   });
 
   // --- Table (always shows all pharmacies, hidden ones dimmed) ---
-  const allStats = pharmacies.map(p => ({ p, s: stats(p.reviews) }));
+  const allStats = allStatsArg || pharmacies.map(p => ({ p, s: stats(p.reviews) }));
   const tbody = $('#compare-table tbody');
   tbody.innerHTML = '';
   for (let i = 0; i < allStats.length; i++) {
@@ -892,7 +1089,11 @@ function renderCompare() {
     tbody.appendChild(tr);
   }
 
+  renderPodium(visible, allStats);
+  renderOvertakeCards(visible, allStats);
+  renderVelocityRatioStrip(visible, allStats);
   renderCompareCumulative(visible);
+  renderCompareGap(visible);
   renderCompareVelocity(visible);
   renderCompareRating(visible);
   renderMilestones(visible);
@@ -915,6 +1116,229 @@ function renderCompare() {
       if (confirm(`Remove competitor "${btn.dataset.id}"?`)) removeCompetitor(btn.dataset.id);
     };
   });
+}
+
+/* ---------- Podium (top of competitor comparison) ---------- */
+function renderPodium(visible, allStats) {
+  const fillSection = (containerId, key, formatter) => {
+    const container = $(containerId);
+    container.innerHTML = '';
+    if (!visible.length) return;
+    const visibleStats = allStats.filter(({ p }) => visible.includes(p));
+    const sorted = visibleStats.slice().sort((a, b) => b.s[key] - a.s[key]);
+    const top = sorted.slice(0, 3);
+    top.forEach((entry, i) => {
+      const { p, s } = entry;
+      const podiumCls = i === 0 ? 'podium-1' : (i === 1 ? 'podium-2' : 'podium-3');
+      const mineCls = p.isMine ? ' mine-glow' : '';
+      const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉');
+      const card = document.createElement('div');
+      card.className = `stat ${podiumCls}${mineCls}`;
+      card.innerHTML =
+        `<div class="label">${medal} ${i + 1}${i === 0 ? 'st' : (i === 1 ? 'nd' : 'rd')} place</div>` +
+        `<div class="value" style="font-size:18px"><span style="color:${p.color}">●</span> ${escapeHtml(p.name)}${p.isMine ? ' <span class="muted small">(you)</span>' : ''}</div>` +
+        `<div class="sub">${formatter(s)}</div>`;
+      container.appendChild(card);
+    });
+  };
+  fillSection('#podium-count', 'total', s => `${fmt(s.total)} reviews`);
+  fillSection('#podium-bayes', 'bayes', s => `${s.bayes.toFixed(2)}★ Bayesian · ${s.avg.toFixed(2)}★ raw`);
+}
+
+/* ---------- ETA-to-overtake cards (per visible competitor) ---------- */
+function renderOvertakeCards(visible, allStats) {
+  const container = $('#overtake-cards');
+  container.innerHTML = '';
+  const mine = visible.find(p => p.isMine);
+  const comps = visible.filter(p => !p.isMine);
+  if (!mine || !comps.length) {
+    container.innerHTML = '<div class="muted small" style="grid-column:1/-1">' +
+      (!mine ? 'Import your pharmacy to see catch-up risk.' : 'No visible competitors — toggle one on.') +
+      '</div>';
+    return;
+  }
+  const myRate = rate90(mine.reviews);  // per day
+  const myTotal = mine.reviews.length;
+  for (const c of comps) {
+    const theirRate = rate90(c.reviews);
+    const theirTotal = c.reviews.length;
+    const gap = myTotal - theirTotal;  // positive = we lead
+    const card = document.createElement('div');
+    let cls = 'stat steady', value = '—', sub = '';
+    if (gap < 0) {
+      cls = 'stat threat';
+      value = `Already ahead by ${fmt(-gap)}`;
+      const diff = theirRate - myRate;
+      sub = diff > 0 ? `growing lead at ${(diff * 30).toFixed(1)}/mo` : `we're gaining at ${((-diff) * 30).toFixed(1)}/mo`;
+    } else if (theirRate <= myRate) {
+      cls = 'stat safe';
+      value = 'No risk at current pace';
+      sub = `Lead: ${fmt(gap)} reviews · their pace ${(theirRate * 30).toFixed(1)}/mo vs your ${(myRate * 30).toFixed(1)}/mo`;
+    } else {
+      cls = 'stat threat';
+      const days = gap / (theirRate - myRate);
+      const eta = new Date(Date.now() + days * DAY);
+      value = `Catches us in ${formatDuration(days)}`;
+      sub = `Gap ${fmt(gap)} · ETA ${eta.toLocaleDateString()} · their ${(theirRate * 30).toFixed(1)}/mo vs your ${(myRate * 30).toFixed(1)}/mo`;
+    }
+    card.className = cls;
+    card.innerHTML =
+      `<div class="label"><span style="color:${c.color}">●</span> ${escapeHtml(c.name)}</div>` +
+      `<div class="value" style="font-size:16px">${value}</div>` +
+      `<div class="sub">${sub}</div>`;
+    container.appendChild(card);
+  }
+}
+
+/* ---------- Velocity ratio + acceleration strip ---------- */
+function renderVelocityRatioStrip(visible, allStats) {
+  const container = $('#velocity-ratio-strip');
+  container.innerHTML = '';
+  const mine = visible.find(p => p.isMine);
+  const comps = visible.filter(p => !p.isMine);
+  if (!mine || !comps.length) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+  const myRate90 = rate90(mine.reviews);
+  const myPerMo = myRate90 * 30;
+  for (const c of comps) {
+    const theirRate90 = rate90(c.reviews);
+    const theirRate30 = rate30(c.reviews);
+    const theirPerMo = theirRate90 * 30;
+    const maxRate = Math.max(myPerMo, theirPerMo, 0.1);
+
+    // Acceleration: compare 30d vs 90d rate; tolerance proportional to baseline.
+    let accelKind = 'steady', accelText = '► steady';
+    if (theirRate90 === 0 && theirRate30 === 0) { accelKind = 'steady'; accelText = '⚫ dormant'; }
+    else if (theirRate90 === 0 && theirRate30 > 0) { accelKind = 'up'; accelText = '▲ resuming'; }
+    else {
+      const delta = theirRate30 - theirRate90;
+      const tol = Math.max(0.005, 0.05 * theirRate90);
+      if (delta > tol) { accelKind = 'up'; accelText = '▲ accelerating'; }
+      else if (delta < -tol) { accelKind = 'down'; accelText = '▼ decelerating'; }
+    }
+
+    let borderCls = 'steady';
+    if (theirRate90 > myRate90 * 1.05) borderCls = 'threat';
+    else if (theirRate90 < myRate90 * 0.95) borderCls = 'safe';
+
+    const myBarW = (myPerMo / maxRate) * 100;
+    const theirBarW = (theirPerMo / maxRate) * 100;
+
+    const card = document.createElement('div');
+    card.className = `stat ${borderCls}`;
+    card.innerHTML =
+      `<div class="label"><span style="color:${c.color}">●</span> ${escapeHtml(c.name)} ` +
+        `<span class="accel-chip ${accelKind}" style="margin-left:6px">${accelText}</span></div>` +
+      `<div class="value" style="font-size:16px">${theirPerMo.toFixed(1)}/mo` +
+        ` <span class="muted small">vs your ${myPerMo.toFixed(1)}/mo</span></div>` +
+      `<div style="margin:6px 0 2px">` +
+        `<div class="bar-bg" style="width:100%"><div class="bar" style="width:${theirBarW.toFixed(1)}%; background:${c.color}"></div></div>` +
+        `<div class="bar-bg" style="width:100%; margin-top:3px"><div class="bar" style="width:${myBarW.toFixed(1)}%; background:var(--home)"></div></div>` +
+      `</div>` +
+      `<div class="sub">30d: ${(theirRate30 * 30).toFixed(1)}/mo · 90d: ${theirPerMo.toFixed(1)}/mo</div>`;
+    container.appendChild(card);
+  }
+}
+
+/* ---------- Gap-over-time chart ---------- */
+function renderCompareGap(visible) {
+  const svg = $('#chart-compare-gap');
+  const legend = $('#legend-compare-gap');
+  svg.innerHTML = ''; legend.innerHTML = '';
+  const W = 800, H = 280, padL = 48, padR = 56, padT = 14, padB = 32;
+  const f = { W, H, padL, padR, padT, padB };
+  const mine = visible.find(p => p.isMine);
+  const comps = visible.filter(p => !p.isMine);
+  if (!mine || !comps.length) return;
+
+  // Common timeline: month-by-month from earliest across all visible to now.
+  let minT = Infinity;
+  for (const p of visible) {
+    if (p.reviews.length) minT = Math.min(minT, new Date(p.reviews[0].date).getTime());
+  }
+  const maxT = Date.now();
+  if (!isFinite(minT)) return;
+
+  const start = new Date(minT); start.setDate(1); start.setHours(0, 0, 0, 0);
+  const sampleTimes = [];
+  for (let m = new Date(start); m.getTime() <= maxT; m.setMonth(m.getMonth() + 1)) {
+    sampleTimes.push(m.getTime());
+  }
+
+  // For each competitor compute gap series.
+  const series = comps.map(c => ({
+    p: c,
+    points: sampleTimes.map(t => ({ t, gap: countAt(mine.reviews, t) - countAt(c.reviews, t) })),
+  }));
+
+  let maxAbs = 1;
+  for (const s of series) {
+    for (const pt of s.points) {
+      const a = Math.abs(pt.gap);
+      if (a > maxAbs) maxAbs = a;
+    }
+  }
+  const yMin = -maxAbs, yMax = maxAbs;
+
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yOf = v => f.padT + ((yMax - v) / (yMax - yMin)) * (f.H - f.padT - f.padB);
+
+  // Y gridlines + labels at 5 levels including 0.
+  for (let i = 0; i <= 4; i++) {
+    const frac = i / 4;
+    const val = yMax - frac * (yMax - yMin);
+    const y = f.padT + frac * (f.H - f.padT - f.padB);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', f.padL); ln.setAttribute('x2', f.W - f.padR);
+    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+    ln.setAttribute('stroke', Math.abs(val) < 0.01 ? '#8b95a7' : '#232b3a');
+    ln.setAttribute('stroke-width', Math.abs(val) < 0.01 ? '1.2' : '1');
+    svg.appendChild(ln);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', f.padL - 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
+    lbl.setAttribute('text-anchor', 'end');
+    lbl.textContent = Math.round(val);
+    svg.appendChild(lbl);
+  }
+
+  drawYearTicks(svg, f, minT, maxT, xOf);
+  drawInflection(svg, f, minT, maxT, xOf);
+
+  series.forEach(({ p, points }) => {
+    const pts = points.map(pt => ({ x: xOf(pt.t), y: yOf(pt.gap) }));
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('d', smoothPath(pts));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', p.color);
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(line);
+    // Final gap label at right.
+    const last = points[points.length - 1];
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', xOf(last.t) + 4);
+    lbl.setAttribute('y', yOf(last.gap) + 3);
+    lbl.setAttribute('fill', p.color);
+    lbl.setAttribute('font-size', '11');
+    lbl.setAttribute('font-weight', '600');
+    lbl.textContent = (last.gap >= 0 ? '+' : '') + last.gap;
+    svg.appendChild(lbl);
+
+    const k = document.createElement('div');
+    k.className = 'key';
+    k.innerHTML = `<span class="swatch" style="background:${p.color}"></span>vs ${escapeHtml(p.name)}`;
+    legend.appendChild(k);
+  });
+
+  const note = document.createElement('div');
+  note.className = 'key muted';
+  note.style.marginLeft = 'auto';
+  note.textContent = 'above 0 = you lead';
+  legend.appendChild(note);
 }
 
 function drawMultiYGrid(svg, f, maxV, fmtFn = String) {
@@ -1511,8 +1935,15 @@ function renderCumulative() {
 
   const minT = spread[0]._t;
   const now = Date.now();
-  const maxT = Math.max(now, spread[spread.length - 1]._t);
-  const maxC = spread.length;
+  // Trajectory projection: extend the chart to today + 365d at the 90-day
+  // rolling rate, and bump maxC to include the projected endpoint so the
+  // dashed forecast line fits inside the existing Y axis.
+  const myRate = rate90(r);  // per day
+  const forecastDays = 365;
+  const forecastEndT = now + forecastDays * DAY;
+  const forecastEndC = spread.length + myRate * forecastDays;
+  const maxT = Math.max(now, spread[spread.length - 1]._t, forecastEndT);
+  const maxC = Math.max(spread.length, Math.ceil(forecastEndC));
   const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
   const yOf = c => f.padT + (1 - c / maxC) * (f.H - f.padT - f.padB);
 
@@ -1521,11 +1952,11 @@ function renderCumulative() {
   drawInflection(svg, f, minT, maxT, xOf);
 
   const path = spread.map((x, i) => ({ x: xOf(x._t), y: yOf(i + 1) }));
-  path.push({ x: xOf(now), y: yOf(maxC) });
+  path.push({ x: xOf(now), y: yOf(spread.length) });
 
   const fill = document.createElementNS(ns, 'path');
   fill.setAttribute('d', smoothPath(path) +
-    ` L${(f.W - f.padR).toFixed(2)},${(f.H - f.padB).toFixed(2)} L${f.padL.toFixed(2)},${(f.H - f.padB).toFixed(2)} Z`);
+    ` L${xOf(now).toFixed(2)},${(f.H - f.padB).toFixed(2)} L${f.padL.toFixed(2)},${(f.H - f.padB).toFixed(2)} Z`);
   fill.setAttribute('fill', '#4f8cff'); fill.setAttribute('fill-opacity', '0.12');
   svg.appendChild(fill);
 
@@ -1536,6 +1967,49 @@ function renderCumulative() {
   line.setAttribute('stroke-width', '2');
   line.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(line);
+
+  // Trajectory projection: dashed forecast line from now to now+12mo.
+  let projN6 = 0, projN12 = 0;
+  if (myRate > 0) {
+    const startN = spread.length;
+    const t6 = now + 182 * DAY;
+    const t12 = now + 365 * DAY;
+    projN6 = Math.round(myRate * 182);
+    projN12 = Math.round(myRate * 365);
+    const forecast = document.createElementNS(ns, 'line');
+    forecast.setAttribute('x1', xOf(now)); forecast.setAttribute('y1', yOf(startN));
+    forecast.setAttribute('x2', xOf(t12)); forecast.setAttribute('y2', yOf(startN + projN12));
+    forecast.setAttribute('stroke', '#4f8cff');
+    forecast.setAttribute('stroke-width', '2');
+    forecast.setAttribute('stroke-dasharray', '6,4');
+    forecast.setAttribute('opacity', '0.7');
+    svg.appendChild(forecast);
+    // Vertical "now" reference line so the forecast region is visually distinct.
+    const nowLine = document.createElementNS(ns, 'line');
+    nowLine.setAttribute('x1', xOf(now)); nowLine.setAttribute('x2', xOf(now));
+    nowLine.setAttribute('y1', f.padT); nowLine.setAttribute('y2', f.H - f.padB);
+    nowLine.setAttribute('stroke', '#8b95a7');
+    nowLine.setAttribute('stroke-dasharray', '2,3');
+    nowLine.setAttribute('opacity', '0.5');
+    svg.appendChild(nowLine);
+    // Annotation markers at 6mo and 12mo.
+    for (const [tMark, dn, label] of [[t6, projN6, '+6mo'], [t12, projN12, '+12mo']]) {
+      const cy = yOf(startN + dn);
+      const cx = xOf(tMark);
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy);
+      dot.setAttribute('r', '3.5'); dot.setAttribute('fill', '#4f8cff');
+      dot.setAttribute('opacity', '0.85');
+      svg.appendChild(dot);
+      const lbl = document.createElementNS(ns, 'text');
+      lbl.setAttribute('x', cx); lbl.setAttribute('y', cy - 6);
+      lbl.setAttribute('fill', '#4f8cff'); lbl.setAttribute('font-size', '10');
+      lbl.setAttribute('font-weight', '600');
+      lbl.setAttribute('text-anchor', 'middle');
+      lbl.textContent = `${label}: ~${startN + dn}`;
+      svg.appendChild(lbl);
+    }
+  }
 
   const colors = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
   spread.forEach((x, i) => {
@@ -1561,7 +2035,9 @@ function renderCumulative() {
   const note = document.createElement('div');
   note.className = 'key muted';
   note.style.marginLeft = 'auto';
-  note.textContent = `${r.length} reviews, same-day clusters spread for smoothness`;
+  note.textContent = myRate > 0
+    ? `${r.length} reviews · current pace ${(myRate * 30).toFixed(1)}/mo → projected +${projN6} by 6mo, +${projN12} by 12mo`
+    : `${r.length} reviews · no recent activity — no forecast`;
   legend.appendChild(note);
 }
 
@@ -1816,6 +2292,233 @@ function renderRecent() {
   }
 }
 
+/* ========================== Headline digest ========================= */
+
+function buildHeadlineCandidates(s, pharmacies, allStats, events) {
+  const out = [];
+  const now = Date.now();
+  const day = DAY;
+  const mine = pharmacies.find(p => p.isMine);
+
+  // Catch-up alert: nearest competitor ETA <= 365 days.
+  if (mine && pharmacies.length > 1) {
+    const hidden = new Set(state.hidden || []);
+    const myRate = rate90(mine.reviews);
+    let worst = null;
+    for (const c of pharmacies) {
+      if (c.isMine || hidden.has(c.placeId)) continue;
+      const theirRate = rate90(c.reviews);
+      const gap = mine.reviews.length - c.reviews.length;
+      if (gap <= 0 || theirRate <= myRate) continue;
+      const days = gap / (theirRate - myRate);
+      if (days <= 365 && (!worst || days < worst.days)) {
+        worst = { c, days, gap };
+      }
+    }
+    if (worst) {
+      out.push({ p: 9, html: `⚠ <b>${escapeHtml(worst.c.name)}</b> is closing in — could overtake you in <b>${formatDuration(worst.days)}</b> at current rates (gap ${worst.gap}).` });
+    }
+  }
+
+  // Recent overtakes (count or rating crossovers in last 60d where mine won).
+  if (mine && events && events.length) {
+    const cutoff = now - 60 * day;
+    const myId = state.placeId;
+    const recent = events.filter(e =>
+      e.t >= cutoff &&
+      (e.kind === 'count-cross' || e.kind === 'rating-cross') &&
+      Array.isArray(e.subjects) && e.subjects[0] === myId
+    ).sort((a, b) => b.t - a.t)[0];
+    if (recent) {
+      out.push({ p: 8, html: `🚀 ${recent.html}` });
+    }
+    // Threshold ups in last 60d.
+    const up = events.filter(e =>
+      e.t >= cutoff && e.kind === 'rating-up' &&
+      Array.isArray(e.subjects) && e.subjects[0] === myId
+    ).sort((a, b) => b.t - a.t)[0];
+    if (up) out.push({ p: 7, html: `✨ ${up.html}` });
+    // Threshold downs in last 60d.
+    const down = events.filter(e =>
+      e.t >= cutoff && e.kind === 'rating-down' &&
+      Array.isArray(e.subjects) && e.subjects[0] === myId
+    ).sort((a, b) => b.t - a.t)[0];
+    if (down) out.push({ p: 6, html: `⚠ ${down.html}` });
+    // Own milestone in last 60d.
+    const ms = events.filter(e =>
+      e.t >= cutoff && e.kind === 'milestone' &&
+      Array.isArray(e.subjects) && e.subjects[0] === myId
+    ).sort((a, b) => b.t - a.t)[0];
+    if (ms) out.push({ p: 5, html: `🎯 ${ms.html}` });
+  }
+
+  // Clean year.
+  if (s.daysSinceLastCrit != null && s.daysSinceLastCrit > 365) {
+    out.push({ p: 4, html: `<b>Clean year</b> — no 1-2★ reviews in the last 12 months (${fmt(s.daysSinceLastCrit)} days).` });
+  }
+
+  // Pace vs prior 90d.
+  if (s.total > 0) {
+    const last90n = s.last90;
+    const prior90Start = now - 180 * day;
+    const prior90End = now - 90 * day;
+    const prior90n = state.reviews.filter(r => {
+      const t = new Date(r.date).getTime();
+      return t >= prior90Start && t < prior90End;
+    }).length;
+    if (last90n + prior90n > 0) {
+      const diff = last90n - prior90n;
+      const dir = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
+      const sign = diff > 0 ? '+' : '';
+      out.push({ p: 3, html: `${(s.last90 / 30).toFixed(1)} reviews/month over the last 90 days (${dir} ${sign}${diff} vs prior 90).` });
+    }
+  }
+
+  // Fallback.
+  out.push({ p: 0, html: `${fmt(s.total)} reviews · ${s.avg.toFixed(2)}★ avg · ${fmt(s.last30)} new in the last 30 days.` });
+
+  out.sort((a, b) => b.p - a.p);
+  return out;
+}
+
+function renderHeadline(s, pharmacies, allStats, events) {
+  const sec = $('#headline-section');
+  if (!s || !s.total) { sec.style.display = 'none'; return; }
+  const candidates = buildHeadlineCandidates(s, pharmacies, allStats, events);
+  if (!candidates.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  $('#headline-text').innerHTML = candidates[0].html;
+  const dates = state.reviews.map(r => new Date(r.date).getTime()).filter(t => !isNaN(t));
+  const latestT = dates.length ? Math.max(...dates) : null;
+  $('#headline-meta').textContent = latestT
+    ? `As of ${new Date(latestT).toLocaleDateString()} · ${fmt(state.reviews.length)} reviews on file`
+    : '';
+}
+
+/* ===================== What's new since last visit =================== */
+
+function renderWhatsNew(prevLastViewedAt, events) {
+  const sec = $('#whatsnew-section');
+  const list = $('#whatsnew-list');
+  const since = $('#whatsnew-since');
+  list.innerHTML = '';
+  if (!prevLastViewedAt) { sec.style.display = 'none'; return; }
+  const sinceTs = new Date(prevLastViewedAt).getTime();
+  if (!isFinite(sinceTs)) { sec.style.display = 'none'; return; }
+
+  const deltas = [];
+  // New milestone-like events since last visit.
+  for (const e of (events || [])) {
+    if (e.t > sinceTs) deltas.push({ t: e.t, color: e.color, html: e.html, kind: e.kind });
+  }
+  // Own new reviews since last visit (separate from milestones — show count).
+  const newOwn = state.reviews.filter(r => new Date(r.date).getTime() > sinceTs).length;
+  if (newOwn > 0) {
+    deltas.unshift({
+      t: Date.now(), color: '#ffd166',
+      html: `<b>${newOwn}</b> new own ${newOwn === 1 ? 'review' : 'reviews'} since last visit`,
+      kind: 'new-reviews',
+    });
+  }
+  // Competitor new reviews aggregated.
+  for (const c of state.competitors || []) {
+    const n = c.reviews.filter(r => new Date(r.date).getTime() > sinceTs).length;
+    if (n > 0) {
+      deltas.push({
+        t: Date.now(), color: '#8b95a7',
+        html: `<b>${n}</b> new ${n === 1 ? 'review' : 'reviews'} on <b>${escapeHtml(c.name)}</b>`,
+        kind: 'new-reviews',
+      });
+    }
+  }
+  if (!deltas.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  since.textContent = `(${new Date(prevLastViewedAt).toLocaleDateString()})`;
+
+  const cap = 6;
+  deltas.sort((a, b) => b.t - a.t);
+  const shown = deltas.slice(0, cap);
+  for (const e of shown) {
+    const row = document.createElement('div');
+    row.className = 'milestone';
+    row.innerHTML =
+      `<div class="milestone-date">${new Date(e.t).toLocaleDateString()}</div>` +
+      `<div class="milestone-dot" style="background:${e.color || '#888'}"></div>` +
+      `<div class="milestone-text">${e.html}</div>`;
+    list.appendChild(row);
+  }
+  if (deltas.length > cap) {
+    const extra = document.createElement('div');
+    extra.className = 'muted small';
+    extra.style.marginTop = '6px';
+    extra.textContent = `and ${deltas.length - cap} more…`;
+    list.appendChild(extra);
+  }
+}
+
+/* ============================== Goals =============================== */
+
+function renderGoals(s) {
+  // Reflect persisted values back into the inputs.
+  const gC = state.goals && Number.isFinite(state.goals.count) ? state.goals.count : null;
+  const gR = state.goals && Number.isFinite(state.goals.rating) ? state.goals.rating : null;
+  if (gC != null) $('#goal-count-input').value = gC; else $('#goal-count-input').value = '';
+  if (gR != null) $('#goal-rating-input').value = gR; else $('#goal-rating-input').value = '';
+
+  const myRate = rate90(state.reviews);
+  // --- Count goal ---
+  const cBar = $('#goal-count-bar');
+  const cSub = $('#goal-count-sub');
+  if (gC != null && gC > 0) {
+    const pct = Math.min(100, (s.total / gC) * 100);
+    cBar.style.width = pct.toFixed(1) + '%';
+    if (s.total >= gC) {
+      cSub.innerHTML = `<span style="color:var(--good)"><b>Goal reached!</b></span> ${fmt(s.total)} ≥ target ${fmt(gC)}.`;
+    } else if (myRate > 0) {
+      const need = gC - s.total;
+      const days = need / myRate;
+      const eta = new Date(Date.now() + days * DAY);
+      cSub.innerHTML = `${pct.toFixed(0)}% — need <b>${fmt(need)}</b> more at current pace (${(myRate * 30).toFixed(1)}/mo) → ETA <b>${eta.toLocaleDateString()}</b> (${formatDuration(days)}).`;
+    } else {
+      cSub.innerHTML = `${pct.toFixed(0)}% — need <b>${fmt(gC - s.total)}</b> more, but no recent activity to project an ETA.`;
+    }
+  } else {
+    cBar.style.width = '0%';
+    cSub.textContent = 'Set a target review count to see progress and ETA.';
+  }
+
+  // --- Bayesian rating goal ---
+  // Solve: (sumStars + N*5 + PRIOR_N*PRIOR_MEAN) / (total + N + PRIOR_N) = target
+  // N = (target*(total + PRIOR_N) - sumStars - PRIOR_N*PRIOR_MEAN) / (5 - target)
+  const rBar = $('#goal-rating-bar');
+  const rSub = $('#goal-rating-sub');
+  const PRIOR_N = 50, PRIOR_MEAN = 4.0;
+  if (gR != null && gR >= 1 && gR <= 5) {
+    const pct = Math.min(100, (s.bayes / gR) * 100);
+    rBar.style.width = pct.toFixed(1) + '%';
+    if (s.bayes >= gR) {
+      rSub.innerHTML = `<span style="color:var(--good)"><b>Goal reached!</b></span> Bayesian ${s.bayes.toFixed(2)}★ ≥ target ${gR.toFixed(2)}★.`;
+    } else if (gR >= 5) {
+      rSub.textContent = 'Targeting 5.00★ is unreachable with any finite review mix.';
+    } else {
+      const sumStars = s.avg * s.total;
+      const N = (gR * (s.total + PRIOR_N) - sumStars - PRIOR_N * PRIOR_MEAN) / (5 - gR);
+      if (N <= 0) {
+        rSub.innerHTML = `Already on track — current trajectory lands above ${gR.toFixed(2)}★.`;
+      } else if (myRate > 0) {
+        const days = N / myRate;
+        const eta = new Date(Date.now() + days * DAY);
+        rSub.innerHTML = `${pct.toFixed(0)}% — need ~<b>${fmt(Math.ceil(N))}</b> more 5★ reviews → ETA <b>${eta.toLocaleDateString()}</b> (${formatDuration(days)} at current pace).`;
+      } else {
+        rSub.innerHTML = `${pct.toFixed(0)}% — need ~<b>${fmt(Math.ceil(N))}</b> more 5★ reviews, but no recent activity to project an ETA.`;
+      }
+    }
+  } else {
+    rBar.style.width = '0%';
+    rSub.textContent = 'Set a target Bayesian-smoothed rating (1.0 - 5.0) to see how many 5★ reviews you need and an ETA.';
+  }
+}
+
 /* =========================== Projection calc ========================= */
 
 function projectionCalc() {
@@ -1956,6 +2659,23 @@ $('#milestone-scope').onchange = (e) => {
   state.milestoneScope = e.target.value;
   save();
   refreshMilestones();
+};
+
+$('#goal-count-save').onclick = () => {
+  const v = parseInt($('#goal-count-input').value, 10);
+  if (!Number.isFinite(v) || v <= 0) { toast('Enter a positive whole number.', 'err'); return; }
+  state.goals.count = v; save(); renderGoals(stats());
+};
+$('#goal-count-clear').onclick = () => {
+  state.goals.count = null; save(); renderGoals(stats());
+};
+$('#goal-rating-save').onclick = () => {
+  const v = parseFloat($('#goal-rating-input').value);
+  if (!Number.isFinite(v) || v < 1 || v > 5) { toast('Enter a rating between 1.0 and 5.0.', 'err'); return; }
+  state.goals.rating = v; save(); renderGoals(stats());
+};
+$('#goal-rating-clear').onclick = () => {
+  state.goals.rating = null; save(); renderGoals(stats());
 };
 
 render();
