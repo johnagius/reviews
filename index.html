@@ -39,237 +39,166 @@
   button.danger { color: var(--bad); }
   input, textarea, select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 8px 10px; font: inherit; }
-  textarea { width: 100%; min-height: 90px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
-  input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,140,255,.15); }
   table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px;
-    cursor: pointer; user-select: none; }
-  th:hover { color: var(--text); }
-  tr:hover td { background: rgba(79, 140, 255, 0.05); }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.name { font-weight: 600; }
-  .home-badge { color: var(--home); margin-right: 6px; }
   .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px;
     border: 1px solid var(--line); color: var(--muted); }
   .pill.good { color: var(--good); border-color: var(--good); }
   .pill.bad  { color: var(--bad);  border-color: var(--bad); }
   .pill.warn { color: var(--warn); border-color: var(--warn); }
-  .stars { color: var(--warn); letter-spacing: 1px; }
   .grid { display: grid; gap: 12px; }
-  .grid.two   { grid-template-columns: 1fr 1fr; }
-  .grid.four  { grid-template-columns: repeat(4, 1fr); }
-  @media (max-width: 900px) { .grid.two, .grid.four { grid-template-columns: 1fr; } }
+  .grid.two { grid-template-columns: 1fr 1fr; }
+  .grid.three { grid-template-columns: repeat(3, 1fr); }
+  .grid.four { grid-template-columns: repeat(4, 1fr); }
+  .grid.six { grid-template-columns: repeat(6, 1fr); }
+  @media (max-width: 1100px) { .grid.six { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px) {
+    .grid.two, .grid.three, .grid.four, .grid.six { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .grid.two, .grid.three, .grid.four, .grid.six { grid-template-columns: 1fr; }
+  }
   .stat { background: var(--panel-2); border-radius: 8px; padding: 12px 14px; }
   .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
   .stat .value { font-size: 24px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .stat .delta { font-size: 12px; margin-top: 4px; color: var(--muted); }
-  .stat .delta.good { color: var(--good); }
-  .stat .delta.bad  { color: var(--bad); }
+  .stat .sub { font-size: 12px; margin-top: 2px; color: var(--muted); }
   details summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
   details[open] summary { color: var(--text); }
   .muted { color: var(--muted); }
   .small { font-size: 12px; }
   .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .bar { display: inline-block; height: 7px; background: var(--accent); border-radius: 3px; vertical-align: middle; }
   .bar-bg { display: inline-block; height: 7px; background: var(--panel-2); border-radius: 3px;
     width: 100px; vertical-align: middle; position: relative; overflow: hidden; }
-  .bar-bg .bar { position: absolute; left: 0; top: 0; }
+  .bar-bg .bar { position: absolute; left: 0; top: 0; height: 100%; border-radius: 3px; }
   .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel); border: 1px solid var(--line);
     color: var(--text); padding: 10px 14px; border-radius: 8px; max-width: 360px;
     box-shadow: 0 8px 24px rgba(0,0,0,.4); font-size: 13px; }
   .toast.good { border-color: var(--good); }
   .toast.err  { border-color: var(--bad); color: var(--bad); }
-  svg.chart { width: 100%; height: 220px; }
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
-  .legend .key { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  svg.chart { width: 100%; height: 220px; display: block; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .legend .key { display: flex; align-items: center; gap: 6px; }
   .legend .swatch { width: 12px; height: 4px; border-radius: 2px; }
-  .star-row { display: grid; grid-template-columns: 28px 1fr 90px; gap: 8px; align-items: center;
+  .star-row { display: grid; grid-template-columns: 30px 1fr 100px; gap: 10px; align-items: center;
     margin-bottom: 4px; font-size: 12px; }
   .star-row .bar-bg { width: 100%; }
-  .target-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
-  .target-row label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
   .footer-note { color: var(--muted); font-size: 11.5px; padding: 12px 0 0; }
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
-  .setup { border: 1px solid rgba(245,166,35,.45); background: rgba(245,166,35,.08); }
-  .setup h2 { color: var(--warn); }
+  .setup { border: 1px solid rgba(79,140,255,.45); background: rgba(79,140,255,.06); }
+  .setup h2 { color: var(--accent); }
   .setup code, .setup pre {
     background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 6px;
     display: inline-block; padding: 2px 6px; }
   .setup pre { display: block; padding: 10px 12px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
-  .setup ol { margin: 10px 0 12px 18px; padding: 0; }
-  .setup ol li { margin: 6px 0; }
-  .pulse {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--accent); margin-right: 6px;
-    animation: pulse 1.2s ease-in-out infinite;
-  }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
-
-  /* Manual form, hidden under Settings */
-  .snap-row { display: grid;
-    grid-template-columns: minmax(180px, 2.2fr) 80px 95px minmax(160px, 1.6fr) 80px;
-    gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
-  .snap-row:last-child { border-bottom: none; }
-  .snap-row input { width: 100%; padding: 6px 9px; }
-  .snap-row .snap-name { font-weight: 600; }
-  .snap-row a.snap-open { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 11.5px; text-decoration: none; }
-  .snap-row .snap-last { color: var(--muted); font-size: 11px; text-align: right; }
-  .snap-header { display: grid;
-    grid-template-columns: minmax(180px, 2.2fr) 80px 95px minmax(160px, 1.6fr) 80px;
-    gap: 8px; padding: 0 0 6px; color: var(--muted); font-size: 11px;
-    text-transform: uppercase; letter-spacing: .5px; }
+  .review-card { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
+  .review-card .head { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
+  .review-card .author { font-weight: 600; }
+  .review-card .stars { color: var(--warn); letter-spacing: 1px; font-size: 12px; }
+  .review-card .when { color: var(--muted); font-size: 11.5px; margin-left: auto; }
+  .review-card .text { font-size: 13px; line-height: 1.5; }
+  .review-card .meta { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Pharmacy Review Tracker</h1>
-  <span class="muted small" id="last-refresh">No snapshots yet</span>
+  <span class="muted small" id="imported-line">No data imported yet</span>
   <div class="grow"></div>
-  <button id="btn-refresh" class="primary">Refresh all</button>
-  <button id="btn-export">Export CSV</button>
-  <button id="btn-config">Settings</button>
+  <button id="btn-import" class="primary">Import JSON</button>
+  <button id="btn-export">Export JSON</button>
+  <button id="btn-clear" class="danger">Clear</button>
+  <input type="file" id="file-input" accept="application/json,.json" style="display:none">
 </header>
 
 <main>
 
   <section id="setup-banner" class="setup" style="display:none">
-    <h2>One-time setup: deploy the scraper Worker</h2>
+    <h2>Get started — import your Google reviews JSON</h2>
     <p class="small" style="margin-top:0">
-      The dashboard needs a tiny Cloudflare Worker that renders each Maps page in a real headless browser (so the rating + reviews actually appear in the DOM) and returns clean JSON. Once it's deployed, "Refresh all" updates every pharmacy invisibly — no copy/paste, no manual entry.
+      Drop in a JSON file from the Google Reviews scraper (the format with <code>review_id</code>, <code>review_date</code>, <code>rating</code>, etc.).
+      Every chart below populates from it instantly. Re-import any time to refresh.
     </p>
-    <ol class="small">
-      <li>Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com</a> → Workers & Pages → Create application → Create Worker. Pick a name (e.g. <code>pharm-scraper</code>) and deploy the Hello World stub.</li>
-      <li>Click your new Worker → <b>Edit code</b> → replace the contents with <code>worker.js</code> from this repo → <b>Save and deploy</b>.</li>
-      <li>Back on the Worker overview: <b>Settings</b> → <b>Bindings</b> → <b>Add</b> → <b>Browser Rendering</b>. Set the variable name to <code>BROWSER</code> → Save.</li>
-      <li>Make sure your account is on the <a href="https://developers.cloudflare.com/workers/platform/pricing/" target="_blank" rel="noopener">Workers Paid plan</a> ($5/month). Browser Rendering's free quota (10 min/day) is plenty for a few pharmacies refreshed weekly.</li>
-      <li>Copy the deployed Worker URL (looks like <code>https://pharm-scraper.your-name.workers.dev</code>) and paste it below.</li>
-    </ol>
     <div class="row" style="margin-top:6px">
-      <input id="setup-url" placeholder="https://pharm-scraper.<you>.workers.dev" style="flex:1; min-width: 320px">
-      <button class="primary" id="btn-setup-save">Save and refresh</button>
+      <button class="primary" id="btn-import-2">Choose JSON file…</button>
+      <span class="muted small">Sample file already in this repo: <code>potters_google_reviews.json</code></span>
     </div>
   </section>
 
-  <section id="status-section" style="display:none">
-    <div class="row">
-      <span class="pulse"></span>
-      <span id="status-text">Refreshing…</span>
+  <section id="dash" style="display:none">
+
+    <div class="grid six" style="margin-bottom:14px">
+      <div class="stat"><div class="label">Pharmacy</div><div class="value" style="font-size:16px" id="s-name">—</div><div class="sub" id="s-place"></div></div>
+      <div class="stat"><div class="label">Total reviews</div><div class="value" id="s-total">—</div><div class="sub" id="s-total-sub"></div></div>
+      <div class="stat"><div class="label">Avg rating</div><div class="value" id="s-avg">—</div><div class="sub" id="s-avg-sub"></div></div>
+      <div class="stat"><div class="label">Last 30 days</div><div class="value" id="s-30">—</div><div class="sub" id="s-30-sub"></div></div>
+      <div class="stat"><div class="label">Last 90 days</div><div class="value" id="s-90">—</div><div class="sub" id="s-90-sub"></div></div>
+      <div class="stat"><div class="label">Span</div><div class="value" style="font-size:16px" id="s-span">—</div><div class="sub" id="s-span-sub"></div></div>
     </div>
-  </section>
 
-  <section id="overview-section">
-    <h2>Your pharmacy vs competitors</h2>
-    <div class="grid four">
-      <div class="stat"><div class="label">Your rating</div><div class="value" id="o-rating">—</div><div class="delta" id="o-rating-delta">No snapshots yet</div></div>
-      <div class="stat"><div class="label">Your reviews</div><div class="value" id="o-reviews">—</div><div class="delta" id="o-reviews-delta">No snapshots yet</div></div>
-      <div class="stat"><div class="label">Rank by rating</div><div class="value" id="o-rank-rating">—</div><div class="delta" id="o-rank-rating-note"></div></div>
-      <div class="stat"><div class="label">Rank by reviews</div><div class="value" id="o-rank-reviews">—</div><div class="delta" id="o-rank-reviews-note"></div></div>
-    </div>
-  </section>
+    <section>
+      <h2>Star distribution</h2>
+      <div id="distribution"></div>
+    </section>
 
-  <section>
-    <h2>Comparison table</h2>
-    <table id="comparison-table">
-      <thead>
-        <tr>
-          <th data-sort="name">Pharmacy</th>
-          <th class="num" data-sort="rating">Rating</th>
-          <th class="num" data-sort="reviewCount">Reviews</th>
-          <th class="num" data-sort="weekDelta">Δ Reviews / 7d</th>
-          <th class="num" data-sort="ratingDelta">Δ Rating / 7d</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="comparison-body"></tbody>
-    </table>
-  </section>
+    <section>
+      <h2>Cumulative reviews over time</h2>
+      <svg class="chart" id="chart-cumulative" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
+      <div class="legend" id="legend-cumulative"></div>
+    </section>
 
-  <section>
-    <h2>Review count history</h2>
-    <svg class="chart" id="history-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
-    <div class="legend" id="history-legend"></div>
-  </section>
+    <section>
+      <h2>Reviews per year</h2>
+      <svg class="chart" id="chart-year" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
+      <div class="legend" id="legend-year"></div>
+    </section>
 
-  <section>
-    <h2>Review submission timeline <span class="muted small" style="font-weight:normal; text-transform:none; letter-spacing:0">(your pharmacy — cumulative count over time, one dot per review)</span></h2>
-    <svg class="chart" id="timeline-chart" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
-    <div class="legend" id="timeline-legend"></div>
-  </section>
+    <section>
+      <h2>Average rating over time <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(12-month trailing average)</span></h2>
+      <svg class="chart" id="chart-rating" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
+      <div class="legend" id="legend-rating"></div>
+    </section>
 
-  <section>
-    <h2>Star distribution</h2>
-    <div class="grid two" id="distributions"></div>
-  </section>
-
-  <section>
-    <h2>Target calculator</h2>
-    <div class="target-row">
-      <label>Pharmacy
-        <select id="t-pharmacy"></select>
-      </label>
-      <label>Target rating
-        <input id="t-target" type="number" min="1" max="5" step="0.1" value="4.8">
-      </label>
-      <label>Future rating mix (avg of new reviews)
-        <input id="t-mix" type="number" min="1" max="5" step="0.1" value="5.0">
-      </label>
-      <button id="t-calc">Calculate</button>
-    </div>
-    <div id="t-result" class="muted">Pick a pharmacy and target to see how many new reviews you need.</div>
-  </section>
-
-  <section id="settings-section" style="display:none">
-    <h2>Settings</h2>
-
-    <details open>
-      <summary>Pharmacies (one per line: <code>name | google-maps-url</code>; prefix with <code>*</code> for your pharmacy)</summary>
-      <textarea id="pharmacies"></textarea>
-    </details>
-
-    <details>
-      <summary>Scraper URL (Cloudflare Worker)</summary>
-      <div class="row" style="margin-top:6px">
-        <input id="scraper-url" placeholder="https://pharm-scraper.<you>.workers.dev" style="flex:1; min-width: 320px">
-        <button id="btn-test-scraper">Test</button>
+    <section>
+      <h2>Engagement</h2>
+      <div class="grid four">
+        <div class="stat"><div class="label">With written text</div><div class="value" id="e-text">—</div><div class="sub" id="e-text-sub"></div></div>
+        <div class="stat"><div class="label">Owner responses</div><div class="value" id="e-resp">—</div><div class="sub" id="e-resp-sub"></div></div>
+        <div class="stat"><div class="label">Total likes</div><div class="value" id="e-likes">—</div><div class="sub" id="e-likes-sub"></div></div>
+        <div class="stat"><div class="label">Languages</div><div class="value" style="font-size:18px" id="e-lang">—</div><div class="sub" id="e-lang-sub"></div></div>
       </div>
-      <div id="scraper-test-result" class="small muted" style="margin-top:6px"></div>
-    </details>
+    </section>
 
-    <details>
-      <summary>Manual entry (fallback if you don't want to deploy the Worker)</summary>
-      <div class="snap-header">
-        <div>Pharmacy</div>
-        <div>Rating</div>
-        <div>Reviews</div>
-        <div>★ Distribution (optional)</div>
-        <div style="text-align:right">Last</div>
-      </div>
-      <div id="snapshot-form"></div>
-      <div class="row" style="margin-top:10px">
-        <button id="btn-save-snapshot">Save manual snapshot</button>
-      </div>
-    </details>
+    <section>
+      <h2>Top reviewers <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(by number of likes their review received)</span></h2>
+      <table id="top-reviewers"><thead><tr>
+        <th>Reviewer</th><th class="num">Rating</th><th class="num">Likes</th><th>When</th><th>Excerpt</th>
+      </tr></thead><tbody></tbody></table>
+    </section>
 
-    <details>
-      <summary>Storage</summary>
-      <div class="row" style="margin-top:6px">
-        <button id="btn-import">Import JSON…</button>
-        <button id="btn-export-json">Export JSON</button>
-        <button id="btn-clear" class="danger">Clear all snapshots</button>
-      </div>
-      <input type="file" id="file-import" accept="application/json" style="display:none">
-    </details>
+    <section>
+      <h2>Recent reviews</h2>
+      <div class="grid two" id="recent-reviews"></div>
+    </section>
 
-    <div class="row" style="margin-top:12px">
-      <button class="primary" id="btn-save-settings">Save</button>
-      <button id="btn-close-settings">Close</button>
-    </div>
+    <section>
+      <h2>Target calculator</h2>
+      <div class="row" style="margin-bottom:8px">
+        <label>Target rating <input id="t-target" type="number" min="1" max="5" step="0.1" value="4.8" style="width:80px"></label>
+        <label>Future review rating (avg)
+          <input id="t-mix" type="number" min="1" max="5" step="0.1" value="5.0" style="width:80px">
+        </label>
+        <button id="t-calc">Calculate</button>
+      </div>
+      <div id="t-result" class="muted">Pick a target rating and the average of future incoming reviews to see how many more you need.</div>
+    </section>
+
   </section>
 
   <div class="footer-note">
-    Pharmacy list and snapshots live in <code>localStorage</code>. Only the scraper Worker — running in your own Cloudflare account — talks to Google. Nothing else leaves the browser.
+    All data lives in <code>localStorage</code>. Use Import JSON to load the latest scraper output, Export JSON to back up the current state, Clear to wipe and start fresh.
   </div>
 </main>
 
@@ -277,41 +206,36 @@
 
 <script>
 /* =========================================================================
-   Pharmacy Review Tracker — auto-refresh via Cloudflare scraper Worker
+   Pharmacy Review Tracker — JSON-import-driven dashboard
+
+   State shape:
+   {
+     pharmacyName: string,
+     placeId: string,
+     importedAt: ISO date,
+     reviews: [{
+       id: string, date: ISO date, ago: string, stars: 1..5,
+       author: string, text: string, likes: number,
+       hasResponse: boolean, profileUrl: string, lang: string,
+     }],
+   }
    ------------------------------------------------------------------------- */
 
-const DEFAULT_PHARMACIES = [
-  { name: "Potter's Pharmacy St. Julian's", home: true,
-    url: "https://www.google.com/maps/place/Potter's+Pharmacy+St.+Julian%60s/@35.9236447,14.4909076,17z/data=!3m1!4b1!4m6!3m5!1s0x130e456beeaed0dd:0xd182291d45db1360!8m2!3d35.9236447!4d14.4909076!16s%2Fg%2F119wmsn4c?entry=ttu" },
-];
+const STORE_KEY = 'pharmRev.v3';
 
-const STORE_KEY = 'pharmRev.v2';
-const state = load();
+const $  = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
+const ns = 'http://www.w3.org/2000/svg';
 
-/* ------------------------------ storage -------------------------------- */
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const s = JSON.parse(raw);
-      if (typeof s.scraperUrl !== 'string') s.scraperUrl = '';
-      return s;
-    }
-    const v1 = localStorage.getItem('pharmRev.v1');
-    if (v1) {
-      const old = JSON.parse(v1);
-      return { pharmacies: old.pharmacies || DEFAULT_PHARMACIES.slice(),
-               snapshots: old.snapshots || {}, lastRefresh: old.lastRefresh || null,
-               scraperUrl: '' };
-    }
+    if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { pharmacies: DEFAULT_PHARMACIES.slice(), snapshots: {}, lastRefresh: null, scraperUrl: '' };
+  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [] };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-
-/* ------------------------------ helpers -------------------------------- */
-const $  = (s, el=document) => el.querySelector(s);
-const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
+const state = load();
 
 function toast(msg, kind='') {
   const t = document.createElement('div');
@@ -320,555 +244,265 @@ function toast(msg, kind='') {
   $('#toast-container').appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }
-function todayKey(d=new Date()) { return d.toISOString().slice(0,10); }
-function nowISO() { return new Date().toISOString(); }
 function fmt(n, digits=0) {
   if (n == null || isNaN(n)) return '—';
   return Number(n).toLocaleString(undefined, {minimumFractionDigits: digits, maximumFractionDigits: digits});
 }
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function parseDist(text) {
-  if (!text) return null;
-  const nums = String(text).replace(/["']/g,'').split(/[,\s]+/).map(n => parseInt(n.trim(), 10));
-  if (nums.length === 5 && nums.every(n => Number.isFinite(n) && n >= 0)) return nums;
-  return null;
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function addSnapshot(name, date, data) {
-  if (!state.snapshots[name]) state.snapshots[name] = [];
-  const arr = state.snapshots[name];
-  const i = arr.findIndex(s => s.date === date);
-  const entry = { date, rating: data.rating, reviewCount: data.reviewCount };
-  if (data.dist) entry.dist = data.dist;
-  if (Array.isArray(data.reviews) && data.reviews.length) entry.reviews = data.reviews;
-  if (i >= 0) arr[i] = entry; else arr.push(entry);
-  arr.sort((a,b) => a.date < b.date ? -1 : 1);
-}
-function latestReviews(name) {
-  const arr = state.snapshots[name];
-  if (!arr) return null;
-  for (let i = arr.length - 1; i >= 0; i--) {
-    if (arr[i].reviews && arr[i].reviews.length) return arr[i].reviews;
+
+/* ============================== Import =============================== */
+
+function pickReviewText(rt) {
+  if (!rt || typeof rt !== 'object') return { text: '', lang: '' };
+  if (rt.en) {
+    const v = rt.en;
+    return { text: (typeof v === 'string' ? v : (v && v.text) || ''), lang: 'en' };
   }
-  return null;
-}
-function latest(name) {
-  const arr = state.snapshots[name];
-  return arr && arr.length ? arr[arr.length-1] : null;
-}
-function earliestSince(name, days) {
-  const arr = state.snapshots[name];
-  if (!arr || !arr.length) return null;
-  const cutoff = new Date(Date.now() - days*86400000).toISOString().slice(0,10);
-  for (const s of arr) if (s.date >= cutoff) return s;
-  return arr[0];
-}
-
-/* ====================================================================
-   AUTO REFRESH (calls the Cloudflare scraper Worker)
-   ==================================================================== */
-
-function scraperEndpoint(targetUrl) {
-  const base = (state.scraperUrl || '').trim().replace(/\/+$/, '');
-  if (!base) return null;
-  return base + '/?url=' + encodeURIComponent(targetUrl);
-}
-
-async function fetchOne(pharm) {
-  const endpoint = scraperEndpoint(pharm.url);
-  if (!endpoint) throw new Error('Scraper URL not set');
-  const res = await fetch(endpoint, { credentials: 'omit', cache: 'no-store' });
-  let body;
-  try { body = await res.json(); } catch { body = null; }
-  if (!res.ok || !body || body.error) {
-    throw new Error((body && body.error) || `HTTP ${res.status}`);
+  for (const k of Object.keys(rt)) {
+    const v = rt[k];
+    const text = typeof v === 'string' ? v : (v && v.text) || '';
+    if (text) return { text, lang: k };
   }
-  if (body.rating == null) {
-    throw new Error('Scraper returned no rating');
-  }
-  return body;
+  return { text: '', lang: '' };
 }
 
-async function refreshAll() {
-  if (!state.scraperUrl) { renderSetup(); return; }
-  if (!state.pharmacies.length) { toast('No pharmacies in Settings yet.', 'err'); return; }
-
-  $('#btn-refresh').disabled = true;
-  $('#status-section').style.display = '';
-  const status = $('#status-text');
-
-  const date = todayKey();
-  let ok = 0, fail = 0;
-  const errors = [];
-
-  for (let i = 0; i < state.pharmacies.length; i++) {
-    const ph = state.pharmacies[i];
-    status.textContent = `Refreshing ${i+1}/${state.pharmacies.length}: ${ph.name}…`;
-    try {
-      const data = await fetchOne(ph);
-      addSnapshot(ph.name, date, data);
-      ok++;
-    } catch (e) {
-      fail++;
-      errors.push(`${ph.name}: ${e.message}`);
-      console.warn('refresh failed', ph.name, e);
+function importScraperJson(json, fileName) {
+  // Top-level: either { "<placeId>": [reviews...] } or directly an array.
+  let bucket = json;
+  let placeId = '';
+  if (json && typeof json === 'object' && !Array.isArray(json)) {
+    const keys = Object.keys(json);
+    for (const k of keys) {
+      if (Array.isArray(json[k])) { bucket = json[k]; placeId = k; break; }
     }
-    state.lastRefresh = nowISO();
-    save();
-    render();
+  }
+  if (!Array.isArray(bucket)) {
+    throw new Error('JSON must contain an array of reviews (or a single-key object whose value is one).');
   }
 
-  $('#status-section').style.display = 'none';
-  $('#btn-refresh').disabled = false;
+  const reviews = bucket
+    .filter(r => r && !r.is_deleted)
+    .map(r => {
+      const { text, lang } = pickReviewText(r.review_text);
+      const stars = Math.round(Number(r.rating) || 0);
+      return {
+        id: r.review_id || `${r.author || 'anon'}|${r.review_date || ''}`,
+        date: r.review_date || '',
+        ago: r.raw_date || '',
+        stars: Math.max(1, Math.min(5, stars || 1)),
+        author: r.author || 'Anonymous',
+        text,
+        lang,
+        likes: Number(r.likes) || 0,
+        hasResponse: !!(r.owner_responses && typeof r.owner_responses === 'object'
+                        && Object.keys(r.owner_responses).length > 0),
+        profileUrl: r.profile_url || '',
+      };
+    })
+    .filter(r => r.date)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  if (ok && !fail) toast(`Refreshed ${ok} pharmac${ok===1?'y':'ies'}.`, 'good');
-  else if (ok && fail) toast(`${ok} refreshed, ${fail} failed: ${errors[0]}`, 'err');
-  else toast(`All ${fail} failed: ${errors[0]}`, 'err');
+  if (!reviews.length) throw new Error('No valid reviews found in JSON.');
+
+  state.placeId = placeId;
+  state.pharmacyName = inferName(reviews, fileName);
+  state.importedAt = new Date().toISOString();
+  state.reviews = reviews;
+  save();
+  render();
+  toast(`Imported ${reviews.length} reviews`, 'good');
 }
 
-async function testScraper() {
-  const url = $('#scraper-url').value.trim();
-  if (!url) { $('#scraper-test-result').textContent = 'Paste a URL first.'; return; }
-  const sample = state.pharmacies[0] && state.pharmacies[0].url;
-  if (!sample) { $('#scraper-test-result').textContent = 'Add a pharmacy first.'; return; }
-  $('#scraper-test-result').textContent = 'Testing…';
-  try {
-    const endpoint = url.replace(/\/+$/, '') + '/?url=' + encodeURIComponent(sample);
-    const res = await fetch(endpoint, { credentials: 'omit', cache: 'no-store' });
-    const body = await res.json();
-    if (!res.ok || body.error) {
-      $('#scraper-test-result').innerHTML = `<span class="err">Failed: ${escapeHtml(body.error || ('HTTP ' + res.status))}</span>`;
-      return;
-    }
-    if (body.rating != null && body.reviewCount != null) {
-      $('#scraper-test-result').innerHTML = `<span style="color:var(--good)">OK — rating <b>${body.rating}</b>, <b>${fmt(body.reviewCount)}</b> reviews${body.dist?', distribution detected':''}.</span>`;
-    } else {
-      $('#scraper-test-result').innerHTML = `<span class="err">Worker reached but returned no rating. Response: ${escapeHtml(JSON.stringify(body))}</span>`;
-    }
-  } catch (e) {
-    $('#scraper-test-result').innerHTML = `<span class="err">Network error: ${escapeHtml(String(e.message || e))}</span>`;
+function inferName(reviews, fileName) {
+  // Owner response often ends with the pharmacy name. Falls back to the
+  // file name if nothing else jumps out.
+  for (const r of reviews) {
+    const m = r.text && r.text.match(/-\s+([A-Z][^.\n]{4,80})$/);
+    if (m) return m[1].trim();
   }
+  if (fileName) return fileName.replace(/\.json$/i, '').replace(/[_-]+/g, ' ');
+  return 'Pharmacy';
 }
 
-/* ====================================================================
-   Manual form fallback (under Settings)
-   ==================================================================== */
+/* =========================== Statistics ============================== */
 
-function renderSnapshotForm() {
-  const wrap = $('#snapshot-form');
+function stats() {
+  const r = state.reviews || [];
+  const total = r.length;
+  const dist = [0, 0, 0, 0, 0];
+  let likes = 0, withText = 0, withResp = 0;
+  const langs = {};
+  for (const x of r) {
+    dist[x.stars - 1] = (dist[x.stars - 1] || 0) + 1;
+    likes += x.likes;
+    if (x.text) withText++;
+    if (x.hasResponse) withResp++;
+    if (x.lang) langs[x.lang] = (langs[x.lang] || 0) + 1;
+  }
+  const sumStars = r.reduce((a, x) => a + x.stars, 0);
+  const avg = total ? sumStars / total : 0;
+  const times = r.map(x => new Date(x.date).getTime()).filter(t => !isNaN(t));
+  const earliest = times.length ? Math.min(...times) : null;
+  const latest = times.length ? Math.max(...times) : null;
+  const now = Date.now();
+  const inLast = days => times.filter(t => now - t <= days * 86400000).length;
+  return { total, dist, likes, withText, withResp, langs, avg, earliest, latest,
+           last30: inLast(30), last90: inLast(90), last365: inLast(365) };
+}
+
+/* ============================== Render =============================== */
+
+function render() {
+  const has = state.reviews && state.reviews.length;
+  $('#setup-banner').style.display = has ? 'none' : '';
+  $('#dash').style.display = has ? '' : 'none';
+  $('#btn-export').disabled = !has;
+  $('#btn-clear').disabled = !has;
+  $('#imported-line').textContent = state.importedAt
+    ? `Imported ${new Date(state.importedAt).toLocaleString()} — ${state.reviews.length} reviews`
+    : 'No data imported yet';
+  if (!has) return;
+
+  const s = stats();
+  $('#s-name').textContent = state.pharmacyName || '—';
+  $('#s-place').textContent = state.placeId || '';
+  $('#s-total').textContent = fmt(s.total);
+  $('#s-total-sub').textContent = `${fmt(s.last365)} in the last year`;
+  $('#s-avg').textContent = s.avg.toFixed(2) + ' ★';
+  $('#s-avg-sub').textContent = `${fmt(s.dist[4])} × 5★ + ${fmt(s.dist[3])} × 4★`;
+  $('#s-30').textContent = fmt(s.last30);
+  $('#s-30-sub').textContent = `${s.last30 ? (s.last30 / 30).toFixed(2) : '0'} per day`;
+  $('#s-90').textContent = fmt(s.last90);
+  $('#s-90-sub').textContent = `${s.last90 ? (s.last90 / 90).toFixed(2) : '0'} per day`;
+  const span = s.earliest ? `${new Date(s.earliest).getFullYear()} – ${new Date(s.latest).getFullYear()}` : '—';
+  $('#s-span').textContent = span;
+  $('#s-span-sub').textContent = s.earliest
+    ? `${Math.round((s.latest - s.earliest) / (365.25 * 86400000) * 10) / 10} years`
+    : '';
+
+  $('#e-text').textContent = fmt(s.withText);
+  $('#e-text-sub').textContent = `${Math.round(100 * s.withText / s.total)}% of total`;
+  $('#e-resp').textContent = fmt(s.withResp);
+  $('#e-resp-sub').textContent = `${Math.round(100 * s.withResp / s.total)}% answered`;
+  $('#e-likes').textContent = fmt(s.likes);
+  $('#e-likes-sub').textContent = s.likes ? `${(s.likes / s.total).toFixed(2)} per review` : '';
+  const langEntries = Object.entries(s.langs).sort((a, b) => b[1] - a[1]);
+  $('#e-lang').textContent = langEntries.length ? langEntries[0][0] : '—';
+  $('#e-lang-sub').textContent = langEntries.map(([k, v]) => `${k}: ${v}`).join(', ');
+
+  renderDistribution(s);
+  renderCumulative();
+  renderPerYear();
+  renderRatingOverTime();
+  renderTopReviewers();
+  renderRecent();
+}
+
+function renderDistribution(s) {
+  const wrap = $('#distribution');
   wrap.innerHTML = '';
-  if (!state.pharmacies.length) {
-    wrap.innerHTML = '<div class="muted small">No pharmacies yet.</div>';
-    return;
-  }
-  for (const ph of state.pharmacies) {
-    const last = latest(ph.name);
+  const total = s.total || 1;
+  const colors = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
+  for (const star of [5, 4, 3, 2, 1]) {
+    const c = s.dist[star - 1] || 0;
+    const pct = (c / total) * 100;
     const row = document.createElement('div');
-    row.className = 'snap-row';
-    row.dataset.name = ph.name;
-    row.innerHTML = `
-      <div class="snap-name">${ph.home ? '<span class="home-badge">★</span>' : ''}${escapeHtml(ph.name)}
-        <a class="snap-open" href="${ph.url}" target="_blank" rel="noopener">open ↗</a></div>
-      <input class="snap-rating"  type="number" step="0.1" min="0" max="5" placeholder="4.7" value="${last && last.rating != null ? last.rating : ''}">
-      <input class="snap-reviews" type="number" step="1"   min="0"          placeholder="348" value="${last && last.reviewCount != null ? last.reviewCount : ''}">
-      <input class="snap-dist"    type="text"                                placeholder="12,4,8,31,293" value="${last && last.dist ? last.dist.join(',') : ''}">
-      <div class="snap-last">${last ? last.rating.toFixed(1) + ' · ' + fmt(last.reviewCount) + '<br><span class="muted">' + last.date + '</span>' : '<span class="muted">—</span>'}</div>
-    `;
+    row.className = 'star-row';
+    row.innerHTML =
+      `<div>${star}★</div>` +
+      `<div class="bar-bg"><div class="bar" style="width:${pct.toFixed(1)}%; background:${colors[star]}"></div></div>` +
+      `<div class="num">${fmt(c)} <span class="muted">(${pct.toFixed(1)}%)</span></div>`;
     wrap.appendChild(row);
   }
 }
-function saveSnapshotFromForm() {
-  const date = todayKey();
-  let ok = 0, skipped = 0;
-  for (const row of $$('.snap-row')) {
-    const name = row.dataset.name;
-    const r = parseFloat(row.querySelector('.snap-rating').value);
-    const c = parseInt(row.querySelector('.snap-reviews').value, 10);
-    const dist = parseDist(row.querySelector('.snap-dist').value);
-    if (!Number.isFinite(r) || !Number.isFinite(c) || r < 0 || r > 5) { skipped++; continue; }
-    addSnapshot(name, date, { rating: r, reviewCount: c, dist });
-    ok++;
-  }
-  if (ok) {
-    state.lastRefresh = nowISO();
-    save(); render();
-    toast(`Saved ${ok} snapshot${ok===1?'':'s'}${skipped?` (${skipped} skipped)`:''}`, 'good');
-  } else toast('Nothing to save', 'err');
+
+function chartFrame(svgEl) {
+  svgEl.innerHTML = '';
+  const W = 800, H = 240, padL = 48, padR = 16, padT = 14, padB = 32;
+  return { W, H, padL, padR, padT, padB };
 }
 
-/* ====================================================================
-   Setup banner
-   ==================================================================== */
-function renderSetup() {
-  const banner = $('#setup-banner');
-  if (!state.scraperUrl) {
-    banner.style.display = '';
-    $('#setup-url').value = '';
-  } else {
-    banner.style.display = 'none';
-  }
-}
-function saveSetupUrl() {
-  const url = $('#setup-url').value.trim();
-  if (!url) { toast('Paste your Worker URL first', 'err'); return; }
-  state.scraperUrl = url;
-  save();
-  renderSetup();
-  toast('Worker URL saved — refreshing…', 'good');
-  setTimeout(refreshAll, 200);
-}
-
-/* ------------------------------- render -------------------------------- */
-let sortBy = 'reviewCount', sortDir = -1;
-
-function render() {
-  $('#last-refresh').textContent = state.lastRefresh
-    ? 'Last refresh: ' + new Date(state.lastRefresh).toLocaleString()
-    : 'No snapshots yet';
-  renderSetup();
-  renderOverview();
-  renderSnapshotForm();
-  renderTable();
-  renderHistory();
-  renderTimeline();
-  renderDistributions();
-  renderTargetSelect();
-}
-
-function renderOverview() {
-  const home = state.pharmacies.find(p => p.home);
-  if (!home) {
-    ['#o-rating','#o-reviews','#o-rank-rating','#o-rank-reviews'].forEach(id => $(id).textContent = '—');
-    $('#o-rating-delta').textContent  = 'No home pharmacy set';
-    $('#o-reviews-delta').textContent = 'Mark one with * in Settings';
-    return;
-  }
-  const cur = latest(home.name);
-  const wkAgo = earliestSince(home.name, 7);
-  $('#o-rating').textContent  = cur ? cur.rating.toFixed(1) : '—';
-  $('#o-reviews').textContent = cur ? fmt(cur.reviewCount) : '—';
-  if (cur && wkAgo && wkAgo !== cur) {
-    setDelta('#o-rating-delta',  cur.rating - wkAgo.rating,  v => (v>=0?'+':'') + v.toFixed(2) + ' / 7d');
-    setDelta('#o-reviews-delta', cur.reviewCount - wkAgo.reviewCount, v => (v>=0?'+':'') + fmt(v) + ' / 7d');
-  } else {
-    $('#o-rating-delta').textContent  = cur ? 'Need a second snapshot for trend' : 'No snapshots yet';
-    $('#o-reviews-delta').textContent = cur ? 'Need a second snapshot for trend' : 'No snapshots yet';
-    $('#o-rating-delta').classList.remove('good','bad');
-    $('#o-reviews-delta').classList.remove('good','bad');
-  }
-  const rows = state.pharmacies.map(p => ({ p, cur: latest(p.name) })).filter(r => r.cur);
-  const byRating  = rows.slice().sort((a,b) => b.cur.rating - a.cur.rating);
-  const byReviews = rows.slice().sort((a,b) => b.cur.reviewCount - a.cur.reviewCount);
-  const rr = byRating.findIndex(r => r.p.name === home.name);
-  const rv = byReviews.findIndex(r => r.p.name === home.name);
-  $('#o-rank-rating').textContent  = rr >= 0 ? `${rr+1} / ${rows.length}` : '—';
-  $('#o-rank-reviews').textContent = rv >= 0 ? `${rv+1} / ${rows.length}` : '—';
-  $('#o-rank-rating-note').textContent  = rr === 0 ? 'leading'
-    : rr > 0 ? `${(byRating[rr-1].cur.rating - byRating[rr].cur.rating).toFixed(2)} behind ${byRating[rr-1].p.name}` : '';
-  $('#o-rank-reviews-note').textContent = rv === 0 ? 'leading'
-    : rv > 0 ? `${fmt(byReviews[rv-1].cur.reviewCount - byReviews[rv].cur.reviewCount)} behind ${byReviews[rv-1].p.name}` : '';
-}
-
-function setDelta(sel, v, fmtFn) {
-  const el = $(sel);
-  el.classList.remove('good','bad');
-  if (v > 0) el.classList.add('good');
-  else if (v < 0) el.classList.add('bad');
-  el.textContent = fmtFn(v);
-}
-
-function renderTable() {
-  const body = $('#comparison-body');
-  body.innerHTML = '';
-  const rows = state.pharmacies.map(p => {
-    const cur = latest(p.name);
-    const wk = earliestSince(p.name, 7);
-    return {
-      p, cur,
-      rating: cur ? cur.rating : null,
-      reviewCount: cur ? cur.reviewCount : null,
-      weekDelta:  cur && wk && wk !== cur ? cur.reviewCount - wk.reviewCount : null,
-      ratingDelta: cur && wk && wk !== cur ? cur.rating - wk.rating : null,
-    };
-  });
-  rows.sort((a,b) => {
-    const va = a[sortBy], vb = b[sortBy];
-    if (va == null && vb == null) return 0;
-    if (va == null) return 1;
-    if (vb == null) return -1;
-    if (sortBy === 'name') return va.p.name > vb.p.name ? sortDir : -sortDir;
-    return (vb - va) * sortDir;
-  });
-  for (const r of rows) {
-    const tr = document.createElement('tr');
-    const home = r.p.home ? '<span class="home-badge">★</span>' : '';
-    const stars = r.rating != null
-      ? `<span class="stars" title="${r.rating.toFixed(1)}">${'★'.repeat(Math.round(r.rating))}${'☆'.repeat(5-Math.round(r.rating))}</span>`
-      : '<span class="muted">—</span>';
-    const wkDelta = r.weekDelta != null
-      ? `<span class="${r.weekDelta>0?'pill good':r.weekDelta<0?'pill bad':'pill'}">${r.weekDelta>=0?'+':''}${fmt(r.weekDelta)}</span>`
-      : '<span class="muted">—</span>';
-    const rtDelta = r.ratingDelta != null
-      ? `<span class="${r.ratingDelta>0?'pill good':r.ratingDelta<0?'pill bad':'pill'}">${r.ratingDelta>=0?'+':''}${r.ratingDelta.toFixed(2)}</span>`
-      : '<span class="muted">—</span>';
-    const status = r.cur ? `<span class="pill good">tracking</span>` : `<span class="pill warn">no snapshot yet</span>`;
-    tr.innerHTML = `
-      <td class="name">${home}<a href="${r.p.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${escapeHtml(r.p.name)}</a></td>
-      <td class="num">${r.rating != null ? `<span style="font-weight:600">${r.rating.toFixed(1)}</span> ${stars}` : stars}</td>
-      <td class="num">${r.reviewCount != null ? fmt(r.reviewCount) : '—'}</td>
-      <td class="num">${wkDelta}</td>
-      <td class="num">${rtDelta}</td>
-      <td>${status}</td>`;
-    body.appendChild(tr);
-  }
-}
-
-function renderHistory() {
-  const svg = $('#history-chart');
-  const legend = $('#history-legend');
-  svg.innerHTML = ''; legend.innerHTML = '';
-  const W = 800, H = 220, padL = 40, padR = 12, padT = 12, padB = 26;
-  const series = state.pharmacies.map(p => ({
-    name: p.name, home: !!p.home,
-    points: (state.snapshots[p.name] || []).map(s => ({ date: s.date, value: s.reviewCount })),
-  })).filter(s => s.points.length > 0);
-  if (!series.length) {
-    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No history yet — click Refresh all to populate.</text>`;
-    return;
-  }
-  const allDates = [...new Set(series.flatMap(s => s.points.map(p => p.date)))].sort();
-  const minV = Math.min(...series.flatMap(s => s.points.map(p => p.value)));
-  const maxV = Math.max(...series.flatMap(s => s.points.map(p => p.value)));
-  const pad = Math.max(1, (maxV - minV) * 0.1);
-  const lo = Math.max(0, minV - pad), hi = maxV + pad;
-  const xOf = i => padL + (i / Math.max(1, allDates.length - 1)) * (W - padL - padR);
-  const yOf = v => padT + (1 - (v - lo) / (hi - lo || 1)) * (H - padT - padB);
-  const ns = 'http://www.w3.org/2000/svg';
-  for (let i=0; i<4; i++) {
-    const y = padT + i*(H-padT-padB)/3;
-    const ln = document.createElementNS(ns, 'line');
-    ln.setAttribute('x1', padL); ln.setAttribute('x2', W - padR);
-    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
-    ln.setAttribute('stroke', '#232b3a');
-    svg.appendChild(ln);
-    const lbl = document.createElementNS(ns, 'text');
-    lbl.setAttribute('x', 6); lbl.setAttribute('y', y + 3);
-    lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
-    lbl.textContent = Math.round(hi - i*(hi-lo)/3).toString();
-    svg.appendChild(lbl);
-  }
-  if (allDates.length >= 2) {
-    [0, allDates.length-1].forEach(i => {
-      const t = document.createElementNS(ns, 'text');
-      t.setAttribute('x', xOf(i)); t.setAttribute('y', H - 8);
-      t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
-      t.setAttribute('text-anchor', i === 0 ? 'start' : 'end');
-      t.textContent = allDates[i];
-      svg.appendChild(t);
-    });
-  }
-  const palette = ['#4f8cff','#2ecc71','#f5a623','#ff5a5f','#a55cff','#26d4cf','#ff8fbf','#9fb33f'];
-  series.forEach((s, idx) => {
-    const color = s.home ? '#ffd166' : palette[idx % palette.length];
-    const pts = s.points.map(p => `${xOf(allDates.indexOf(p.date))},${yOf(p.value)}`).join(' ');
-    const pl = document.createElementNS(ns, 'polyline');
-    pl.setAttribute('points', pts); pl.setAttribute('fill', 'none');
-    pl.setAttribute('stroke', color); pl.setAttribute('stroke-width', s.home ? '2.5' : '1.6');
-    pl.setAttribute('stroke-linejoin', 'round'); pl.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(pl);
-    s.points.forEach(p => {
-      const c = document.createElementNS(ns, 'circle');
-      c.setAttribute('cx', xOf(allDates.indexOf(p.date))); c.setAttribute('cy', yOf(p.value));
-      c.setAttribute('r', '2.5'); c.setAttribute('fill', color);
-      svg.appendChild(c);
-    });
-    const k = document.createElement('div');
-    k.className = 'key';
-    k.innerHTML = `<span class="swatch" style="background:${color}"></span>${escapeHtml(s.name)}${s.home ? ' ★' : ''}`;
-    legend.appendChild(k);
-  });
-}
-
-/* ====================================================================
-   Review submission timeline (smoothed by uncertainty window).
-
-   Google Maps gives each review a relative date like "2 weeks ago" or
-   "a year ago". Older reviews are imprecise — "a year ago" could be
-   anywhere within ±6 months. We treat each review as a uniform
-   distribution over its precision window, then sum the overlaps into
-   monthly buckets so the chart shows a smooth shape rather than a
-   point spike on the imprecise dates.
-   ==================================================================== */
-
-function parseReviewAgo(ago, now = new Date()) {
-  if (!ago) return null;
-  const a = ago.trim().toLowerCase();
-  const day = 86400000;
-  const makeWindow = (daysAgo, windowDays) => {
-    const centerMs = now.getTime() - daysAgo * day;
-    return {
-      centerMs,
-      startMs: centerMs - (windowDays * day) / 2,
-      endMs:   centerMs + (windowDays * day) / 2,
-    };
-  };
-  if (/^(?:just now|moments?\s+ago|recently)$/.test(a)) return makeWindow(0, 1);
-  if (/^yesterday$/.test(a)) return makeWindow(1, 1);
-  // hours/minutes/seconds — recent today
-  if (/^(?:\d+|a|an)\s+(?:second|minute|hour)s?\s+ago$/.test(a)) return makeWindow(0, 1);
-  const m = a.match(/^(?:(\d+)|a|an)\s+(day|week|month|year)s?\s+ago$/);
-  if (!m) return null;
-  const n = m[1] ? parseInt(m[1], 10) : 1;
-  const unitDays = { day: 1, week: 7, month: 30.44, year: 365.25 }[m[2]];
-  return makeWindow(n * unitDays, unitDays);
-}
-
-function reviewsByMonth(reviews, monthsBack = 36) {
-  const now = new Date();
-  const buckets = [];
-  for (let i = monthsBack - 1; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-    buckets.push({
-      label: start.toLocaleString('en', { month: 'short', year: '2-digit' }),
-      startMs: start.getTime(),
-      endMs:   end.getTime(),
-      counts:  [0, 0, 0, 0, 0], // index = star - 1
-      total: 0,
-    });
-  }
-  for (const r of reviews) {
-    const w = parseReviewAgo(r.ago);
-    if (!w) continue;
-    const span = w.endMs - w.startMs;
-    if (span <= 0) continue;
-    const star = (r.stars >= 1 && r.stars <= 5) ? r.stars : null;
-    for (const b of buckets) {
-      const overlap = Math.min(w.endMs, b.endMs) - Math.max(w.startMs, b.startMs);
-      if (overlap <= 0) continue;
-      const frac = overlap / span;
-      b.total += frac;
-      if (star) b.counts[star - 1] += frac;
-    }
-  }
-  return buckets;
-}
-
-function renderTimeline() {
-  const svg = $('#timeline-chart');
-  const legend = $('#timeline-legend');
-  if (!svg) return;
-  svg.innerHTML = ''; legend.innerHTML = '';
-  const home = state.pharmacies.find(p => p.home) || state.pharmacies[0];
-  const reviews = home ? latestReviews(home.name) : null;
-
-  const W = 800, H = 240, padL = 44, padR = 16, padT = 14, padB = 30;
-  const ns = 'http://www.w3.org/2000/svg';
-  if (!reviews || !reviews.length) {
-    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates yet — refresh after deploying the updated Worker.</text>`;
-    return;
-  }
-
-  // For each review, place it at a deterministic-random point inside its
-  // uncertainty window. This spreads "X years ago" clusters across that
-  // year rather than stacking them at a single instant, which is what makes
-  // the cumulative curve smooth instead of stair-stepping vertically.
-  const seedRand = (n) => { const x = Math.sin(n) * 10000; return x - Math.floor(x); };
-  const placed = [];
-  reviews.forEach((r, i) => {
-    const w = parseReviewAgo(r.ago);
-    if (!w) return;
-    const stars = (r.stars >= 1 && r.stars <= 5) ? r.stars : null;
-    if (!stars) return;
-    const frac = seedRand(i * 17 + (r.ago || '').length * 31);
-    placed.push({ t: w.startMs + (w.endMs - w.startMs) * frac, stars, ago: r.ago });
-  });
-  if (!placed.length) {
-    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8b95a7" text-anchor="middle">No per-review dates parsed.</text>`;
-    return;
-  }
-
-  // Sort oldest → newest. The cumulative count at index i is i+1.
-  placed.sort((a, b) => a.t - b.t);
-
-  const now = Date.now();
-  let minT = placed[0].t;
-  const maxT = Math.max(now, placed[placed.length - 1].t);
-  minT -= (maxT - minT) * 0.02;
-
-  const maxCount = placed.length;
-  const xOf = t => padL + ((t - minT) / Math.max(1, maxT - minT)) * (W - padL - padR);
-  const yOf = c => padT + (1 - c / maxCount) * (H - padT - padB);
-
-  // Y gridlines + labels (5 evenly-spaced count ticks).
+function drawYGrid(svg, f, maxV, fmtFn = String) {
   for (let i = 0; i <= 4; i++) {
-    const c = Math.round(maxCount * i / 4);
-    const y = yOf(c);
+    const y = f.padT + (i / 4) * (f.H - f.padT - f.padB);
     const ln = document.createElementNS(ns, 'line');
-    ln.setAttribute('x1', padL); ln.setAttribute('x2', W - padR);
+    ln.setAttribute('x1', f.padL); ln.setAttribute('x2', f.W - f.padR);
     ln.setAttribute('y1', y); ln.setAttribute('y2', y);
     ln.setAttribute('stroke', '#232b3a');
     svg.appendChild(ln);
     const lbl = document.createElementNS(ns, 'text');
-    lbl.setAttribute('x', padL - 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('x', f.padL - 6); lbl.setAttribute('y', y + 3);
     lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
     lbl.setAttribute('text-anchor', 'end');
-    lbl.textContent = String(c);
+    lbl.textContent = fmtFn(maxV - (i / 4) * maxV);
     svg.appendChild(lbl);
   }
+}
 
-  // X-axis ticks at year boundaries.
-  const minYear = new Date(minT).getFullYear();
-  const maxYear = new Date(maxT).getFullYear();
-  const yearSpan = Math.max(1, maxYear - minYear);
-  const yearStep = yearSpan > 8 ? 2 : 1;
-  for (let yr = minYear; yr <= maxYear; yr += yearStep) {
+function drawYearTicks(svg, f, minT, maxT, xOf) {
+  const minY = new Date(minT).getFullYear();
+  const maxY = new Date(maxT).getFullYear();
+  const step = (maxY - minY) > 10 ? 2 : 1;
+  for (let yr = minY; yr <= maxY; yr += step) {
     const tickT = new Date(yr, 0, 1).getTime();
-    if (tickT < minT) continue;
+    if (tickT < minT - 86400000) continue;
     const x = xOf(tickT);
     const ln = document.createElementNS(ns, 'line');
     ln.setAttribute('x1', x); ln.setAttribute('x2', x);
-    ln.setAttribute('y1', padT); ln.setAttribute('y2', H - padB);
+    ln.setAttribute('y1', f.padT); ln.setAttribute('y2', f.H - f.padB);
     ln.setAttribute('stroke', '#1b212c');
     svg.appendChild(ln);
     const t = document.createElementNS(ns, 'text');
-    t.setAttribute('x', x); t.setAttribute('y', H - 12);
+    t.setAttribute('x', x); t.setAttribute('y', f.H - 12);
     t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
     t.setAttribute('text-anchor', 'middle');
-    t.textContent = String(yr);
+    t.textContent = yr;
     svg.appendChild(t);
   }
+}
 
-  // Build the cumulative curve. Smooth it with a Catmull-Rom-style spline
-  // converted to SVG cubic Bezier segments, so the line glides between
-  // points instead of looking jagged.
-  const path = placed.map((p, i) => ({ x: xOf(p.t), y: yOf(i + 1) }));
-  // Extend the curve to "now" at the final count so the line reaches the
-  // right edge instead of dangling at the most-recent review.
-  path.push({ x: xOf(now), y: yOf(maxCount) });
+function smoothPath(pts) {
+  if (pts.length < 2) return '';
+  let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6, cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6, cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+  }
+  return d;
+}
 
-  const smoothPath = (pts) => {
-    if (pts.length < 2) return '';
-    let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[i + 2] || p2;
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
-    }
-    return d;
-  };
+function renderCumulative() {
+  const svg = $('#chart-cumulative');
+  const legend = $('#legend-cumulative');
+  const f = chartFrame(svg);
+  legend.innerHTML = '';
+  const r = state.reviews;
+  if (!r.length) return;
 
-  // Fill under the curve, then the curve itself.
+  const minT = new Date(r[0].date).getTime();
+  const now = Date.now();
+  const maxT = Math.max(now, new Date(r[r.length - 1].date).getTime());
+  const maxC = r.length;
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yOf = c => f.padT + (1 - c / maxC) * (f.H - f.padT - f.padB);
+
+  drawYGrid(svg, f, maxC, v => Math.round(v));
+  drawYearTicks(svg, f, minT, maxT, xOf);
+
+  const path = r.map((x, i) => ({ x: xOf(new Date(x.date).getTime()), y: yOf(i + 1) }));
+  path.push({ x: xOf(now), y: yOf(maxC) });
+
   const fill = document.createElementNS(ns, 'path');
   fill.setAttribute('d', smoothPath(path) +
-    ` L${(W - padR).toFixed(2)},${(H - padB).toFixed(2)} L${padL.toFixed(2)},${(H - padB).toFixed(2)} Z`);
-  fill.setAttribute('fill', '#4f8cff');
-  fill.setAttribute('fill-opacity', '0.12');
+    ` L${(f.W - f.padR).toFixed(2)},${(f.H - f.padB).toFixed(2)} L${f.padL.toFixed(2)},${(f.H - f.padB).toFixed(2)} Z`);
+  fill.setAttribute('fill', '#4f8cff'); fill.setAttribute('fill-opacity', '0.12');
   svg.appendChild(fill);
 
   const line = document.createElementNS(ns, 'path');
@@ -877,202 +511,312 @@ function renderTimeline() {
   line.setAttribute('stroke', '#4f8cff');
   line.setAttribute('stroke-width', '2');
   line.setAttribute('stroke-linejoin', 'round');
-  line.setAttribute('stroke-linecap', 'round');
   svg.appendChild(line);
 
-  // Dots — one per review, colored by star, sitting on the curve.
-  const starColor = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
-  placed.forEach((p, i) => {
+  const colors = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
+  r.forEach((x, i) => {
     const c = document.createElementNS(ns, 'circle');
-    c.setAttribute('cx', xOf(p.t));
+    c.setAttribute('cx', xOf(new Date(x.date).getTime()));
     c.setAttribute('cy', yOf(i + 1));
-    c.setAttribute('r', '2.6');
-    c.setAttribute('fill', starColor[p.stars]);
+    c.setAttribute('r', '2.4');
+    c.setAttribute('fill', colors[x.stars]);
     c.setAttribute('stroke', '#0f1115');
     c.setAttribute('stroke-width', '0.5');
-    const title = document.createElementNS(ns, 'title');
-    title.textContent = `#${i + 1}: ${p.stars}★ — ${p.ago}`;
-    c.appendChild(title);
+    const t = document.createElementNS(ns, 'title');
+    t.textContent = `#${i + 1}: ${x.stars}★ — ${new Date(x.date).toLocaleDateString()} — ${x.author}`;
+    c.appendChild(t);
     svg.appendChild(c);
   });
 
   for (const star of [5, 4, 3, 2, 1]) {
     const k = document.createElement('div');
     k.className = 'key';
-    k.innerHTML = `<span class="swatch" style="background:${starColor[star]}; width:8px; height:8px; border-radius:50%"></span>${star}★`;
+    k.innerHTML = `<span class="swatch" style="background:${colors[star]}; width:8px; height:8px; border-radius:50%"></span>${star}★`;
     legend.appendChild(k);
   }
   const note = document.createElement('div');
   note.className = 'key muted';
   note.style.marginLeft = 'auto';
-  note.textContent = `${placed.length} reviews — smooth cumulative growth, older dates spread across their "X years ago" window.`;
+  note.textContent = `${r.length} reviews, exact dates from JSON`;
   legend.appendChild(note);
 }
 
-function renderDistributions() {
-  const wrap = $('#distributions');
+function renderPerYear() {
+  const svg = $('#chart-year');
+  const legend = $('#legend-year');
+  const f = chartFrame(svg);
+  legend.innerHTML = '';
+  const r = state.reviews;
+  if (!r.length) return;
+
+  const buckets = {};
+  for (const x of r) {
+    const y = new Date(x.date).getFullYear();
+    if (!buckets[y]) buckets[y] = [0, 0, 0, 0, 0];
+    buckets[y][x.stars - 1]++;
+  }
+  const years = Object.keys(buckets).map(Number).sort((a, b) => a - b);
+  const totals = years.map(y => buckets[y].reduce((a, b) => a + b, 0));
+  const maxV = Math.max(1, ...totals);
+  const xStep = (f.W - f.padL - f.padR) / years.length;
+  const xOf = i => f.padL + i * xStep;
+  const yOf = v => f.padT + (1 - v / maxV) * (f.H - f.padT - f.padB);
+
+  drawYGrid(svg, f, maxV, v => Math.round(v));
+
+  const colors = { 5: '#2ecc71', 4: '#7fd17f', 3: '#f5a623', 2: '#ff8f5a', 1: '#ff5a5f' };
+  years.forEach((yr, i) => {
+    let yCursor = f.H - f.padB;
+    const t = document.createElementNS(ns, 'text');
+    t.setAttribute('x', xOf(i) + xStep / 2);
+    t.setAttribute('y', f.H - 12);
+    t.setAttribute('fill', '#8b95a7'); t.setAttribute('font-size', '10');
+    t.setAttribute('text-anchor', 'middle');
+    t.textContent = yr;
+    svg.appendChild(t);
+
+    for (const star of [5, 4, 3, 2, 1]) {
+      const c = buckets[yr][star - 1] || 0;
+      if (c <= 0) continue;
+      const h = (c / maxV) * (f.H - f.padT - f.padB);
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', xOf(i) + 4);
+      rect.setAttribute('width', Math.max(0, xStep - 8));
+      rect.setAttribute('y', yCursor - h);
+      rect.setAttribute('height', h);
+      rect.setAttribute('fill', colors[star]);
+      rect.setAttribute('opacity', '0.9');
+      const title = document.createElementNS(ns, 'title');
+      title.textContent = `${yr}: ${c} × ${star}★`;
+      rect.appendChild(title);
+      svg.appendChild(rect);
+      yCursor -= h;
+    }
+    const totLbl = document.createElementNS(ns, 'text');
+    totLbl.setAttribute('x', xOf(i) + xStep / 2);
+    totLbl.setAttribute('y', yCursor - 4);
+    totLbl.setAttribute('fill', '#e6edf3');
+    totLbl.setAttribute('font-size', '10');
+    totLbl.setAttribute('text-anchor', 'middle');
+    totLbl.textContent = totals[i];
+    svg.appendChild(totLbl);
+  });
+
+  for (const star of [5, 4, 3, 2, 1]) {
+    const k = document.createElement('div');
+    k.className = 'key';
+    k.innerHTML = `<span class="swatch" style="background:${colors[star]}"></span>${star}★`;
+    legend.appendChild(k);
+  }
+}
+
+function renderRatingOverTime() {
+  const svg = $('#chart-rating');
+  const legend = $('#legend-rating');
+  const f = chartFrame(svg);
+  legend.innerHTML = '';
+  const r = state.reviews;
+  if (r.length < 2) return;
+
+  // 12-month trailing average rating sampled monthly across the full span.
+  const minT = new Date(r[0].date).getTime();
+  const now = Date.now();
+  const maxT = Math.max(now, new Date(r[r.length - 1].date).getTime());
+
+  const start = new Date(minT);
+  start.setDate(1); start.setHours(0, 0, 0, 0);
+  const points = [];
+  for (let m = new Date(start); m.getTime() <= maxT; m.setMonth(m.getMonth() + 1)) {
+    const end = m.getTime();
+    const windowStart = end - 365 * 86400000;
+    let sum = 0, n = 0;
+    for (const x of r) {
+      const t = new Date(x.date).getTime();
+      if (t > end) break;
+      if (t >= windowStart) { sum += x.stars; n++; }
+    }
+    if (n > 0) points.push({ t: end, avg: sum / n, n });
+  }
+  if (!points.length) return;
+
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yMin = 1, yMax = 5;
+  const yOf = v => f.padT + ((yMax - v) / (yMax - yMin)) * (f.H - f.padT - f.padB);
+
+  // Y gridlines at 1..5
+  for (let s = 1; s <= 5; s++) {
+    const y = yOf(s);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', f.padL); ln.setAttribute('x2', f.W - f.padR);
+    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+    ln.setAttribute('stroke', '#232b3a');
+    svg.appendChild(ln);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', f.padL - 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
+    lbl.setAttribute('text-anchor', 'end');
+    lbl.textContent = s + '★';
+    svg.appendChild(lbl);
+  }
+  drawYearTicks(svg, f, minT, maxT, xOf);
+
+  const path = points.map(p => ({ x: xOf(p.t), y: yOf(p.avg) }));
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('d', smoothPath(path));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', '#f5a623');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(line);
+
+  // Endpoint dot
+  const last = points[points.length - 1];
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('cx', xOf(last.t));
+  dot.setAttribute('cy', yOf(last.avg));
+  dot.setAttribute('r', '3.5');
+  dot.setAttribute('fill', '#f5a623');
+  const dotTitle = document.createElementNS(ns, 'title');
+  dotTitle.textContent = `Trailing 12mo: ${last.avg.toFixed(2)}★ over ${last.n} reviews`;
+  dot.appendChild(dotTitle);
+  svg.appendChild(dot);
+
+  const k = document.createElement('div');
+  k.className = 'key';
+  k.innerHTML = `<span class="swatch" style="background:#f5a623"></span>12-month trailing avg`;
+  legend.appendChild(k);
+  const note = document.createElement('div');
+  note.className = 'key muted';
+  note.style.marginLeft = 'auto';
+  note.textContent = `current: ${last.avg.toFixed(2)}★`;
+  legend.appendChild(note);
+}
+
+function renderTopReviewers() {
+  const tbody = $('#top-reviewers tbody');
+  tbody.innerHTML = '';
+  const top = state.reviews.slice().sort((a, b) => b.likes - a.likes).slice(0, 10);
+  for (const r of top) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${escapeHtml(r.author)}</td>` +
+      `<td class="num">${r.stars}★</td>` +
+      `<td class="num">${fmt(r.likes)}</td>` +
+      `<td>${new Date(r.date).toLocaleDateString()}</td>` +
+      `<td class="small muted">${escapeHtml((r.text || '').slice(0, 140))}${r.text && r.text.length > 140 ? '…' : ''}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderRecent() {
+  const wrap = $('#recent-reviews');
   wrap.innerHTML = '';
-  let any = false;
-  for (const p of state.pharmacies) {
-    const cur = latest(p.name);
-    const dist = cur && cur.dist;
-    if (!dist) continue;
-    any = true;
-    const total = dist.reduce((a,b)=>a+b, 0) || 1;
-    const box = document.createElement('div');
-    box.className = 'stat';
-    box.innerHTML =
-      `<div class="row" style="justify-content:space-between">
-         <div style="font-weight:600">${p.home ? '★ ' : ''}${escapeHtml(p.name)}</div>
-         <div class="muted small">${fmt(total)} reviews</div>
+  const recent = state.reviews.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+  for (const r of recent) {
+    const div = document.createElement('div');
+    div.className = 'review-card';
+    const starText = '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
+    div.innerHTML =
+      `<div class="head">
+         <div class="author">${escapeHtml(r.author)}</div>
+         <div class="stars">${starText}</div>
+         <div class="when">${new Date(r.date).toLocaleDateString()}${r.ago ? ' · ' + escapeHtml(r.ago) : ''}</div>
        </div>` +
-      [5,4,3,2,1].map(star => {
-        const c = dist[star-1] || 0;
-        const pct = (c / total) * 100;
-        return `<div class="star-row">
-          <div>${star}★</div>
-          <div class="bar-bg"><div class="bar" style="width:${pct.toFixed(1)}%"></div></div>
-          <div class="num">${fmt(c)} <span class="muted small">(${pct.toFixed(0)}%)</span></div>
-        </div>`;
-      }).join('');
-    wrap.appendChild(box);
+      `<div class="text">${escapeHtml(r.text) || '<span class="muted">No written review.</span>'}</div>` +
+      `<div class="meta">${r.likes ? `${r.likes} ${r.likes === 1 ? 'like' : 'likes'}` : 'No likes'}` +
+      `${r.hasResponse ? ' · Owner responded' : ''}` +
+      `${r.lang && r.lang !== 'en' ? ' · ' + r.lang : ''}</div>`;
+    wrap.appendChild(div);
   }
-  if (!any) wrap.innerHTML = '<div class="muted small">Distribution shows once Refresh all has captured 1★-5★ breakdowns (auto-detected by the Worker).</div>';
 }
 
-function renderTargetSelect() {
-  const sel = $('#t-pharmacy');
-  const prev = sel.value;
-  sel.innerHTML = '';
-  for (const p of state.pharmacies) {
-    const o = document.createElement('option');
-    o.value = p.name; o.textContent = (p.home ? '★ ' : '') + p.name;
-    sel.appendChild(o);
-  }
-  const home = state.pharmacies.find(p => p.home);
-  sel.value = prev || (home ? home.name : (state.pharmacies[0] && state.pharmacies[0].name) || '');
-}
+/* ============================ Target calc ============================ */
 
-/* ----------------------------- settings -------------------------------- */
-function pharmaciesToText(arr) {
-  return arr.map(p => `${p.home ? '* ' : ''}${p.name} | ${p.url}`).join('\n');
-}
-function pharmaciesFromText(text) {
-  return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
-    const home = line.startsWith('*');
-    const body = home ? line.slice(1).trim() : line;
-    const i = body.indexOf('|');
-    if (i < 0) return null;
-    return { home, name: body.slice(0, i).trim(), url: body.slice(i+1).trim() };
-  }).filter(p => p && p.name && p.url);
-}
-function openSettings() {
-  $('#pharmacies').value  = pharmaciesToText(state.pharmacies);
-  $('#scraper-url').value = state.scraperUrl || '';
-  $('#settings-section').style.display = '';
-  $('#settings-section').scrollIntoView({behavior:'smooth'});
-}
-function closeSettings() { $('#settings-section').style.display = 'none'; }
-function saveSettings() {
-  state.pharmacies = pharmaciesFromText($('#pharmacies').value);
-  state.scraperUrl = $('#scraper-url').value.trim();
-  save(); render(); toast('Settings saved', 'good');
-}
-
-/* ----------------------------- target calc ----------------------------- */
-function calcTarget() {
-  const name = $('#t-pharmacy').value;
+function targetCalc() {
+  const s = stats();
   const target = parseFloat($('#t-target').value);
   const mix = parseFloat($('#t-mix').value);
-  const cur = latest(name);
-  if (!cur) { $('#t-result').innerHTML = '<span style="color:var(--bad)">No snapshot yet for this pharmacy.</span>'; return; }
-  if (!(target > 0 && target <= 5)) { $('#t-result').textContent = 'Target must be 1.0–5.0'; return; }
-  if (mix <= target) {
-    $('#t-result').innerHTML = `<span style="color:var(--bad)">Average of new reviews (${mix}) must be higher than the target (${target}).</span>`;
+  if (!Number.isFinite(target) || !Number.isFinite(mix) || target < 1 || target > 5 || mix < 1 || mix > 5) {
+    $('#t-result').textContent = 'Enter a target and mix rating between 1.0 and 5.0.';
     return;
   }
-  const need = (target - cur.rating) * cur.reviewCount / (mix - target);
-  if (need <= 0) { $('#t-result').innerHTML = `<span class="pill good">already at or above target</span>`; return; }
-  const wk = earliestSince(name, 7);
-  const wkRate = wk && wk !== cur ? (cur.reviewCount - wk.reviewCount) : null;
-  let eta = '';
-  if (wkRate > 0) {
-    const weeks = need / wkRate;
-    eta = ` — at your current pace (${wkRate.toFixed(0)} reviews/week) that's ~${weeks.toFixed(1)} weeks (${(weeks/4.33).toFixed(1)} months)`;
+  if (target <= s.avg) {
+    $('#t-result').innerHTML = `Already there: current average is <b>${s.avg.toFixed(2)}★</b>.`;
+    return;
   }
-  $('#t-result').innerHTML = `
-    Need <b>${fmt(Math.ceil(need))}</b> new reviews averaging <b>${mix.toFixed(1)}★</b> to move
-    <b>${escapeHtml(name)}</b> from <b>${cur.rating.toFixed(2)}</b> to <b>${target.toFixed(2)}</b>${eta}.
-    <div class="muted small" style="margin-top:6px">Assumes no new ratings below your average.</div>`;
-}
-
-/* ----------------------------- import/export --------------------------- */
-function exportCSV() {
-  const rows = [['date','pharmacy','rating','reviewCount','dist_1','dist_2','dist_3','dist_4','dist_5']];
-  for (const [name, arr] of Object.entries(state.snapshots)) {
-    for (const s of arr) rows.push([s.date, name, s.rating ?? '', s.reviewCount ?? '', ...(s.dist || ['','','','',''])]);
+  if (mix <= target) {
+    $('#t-result').innerHTML = `Impossible at this mix: new reviews averaging <b>${mix.toFixed(1)}★</b> can't pull the average above <b>${mix.toFixed(1)}★</b>.`;
+    return;
   }
-  const csv = rows.map(r => r.map(v => /[,"\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : v).join(',')).join('\n');
-  download('pharmacy-reviews.csv', csv, 'text/csv');
-}
-function exportJSON() { download('pharmacy-reviews.json', JSON.stringify(state, null, 2), 'application/json'); }
-function download(name, content, type) {
-  const blob = new Blob([content], { type });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-}
-function importJSON(file) {
-  const r = new FileReader();
-  r.onload = () => {
-    try { Object.assign(state, JSON.parse(r.result)); save(); render(); toast('Imported', 'good'); }
-    catch (e) { toast('Invalid JSON', 'err'); }
-  };
-  r.readAsText(file);
+  // (sum + mix * n) / (total + n) = target  →  n = total * (target - avg) / (mix - target)
+  const n = Math.ceil(s.total * (target - s.avg) / (mix - target));
+  const ratePer90 = s.last90 / 90;
+  const weeks = ratePer90 ? Math.round(n / (ratePer90 * 7)) : null;
+  $('#t-result').innerHTML =
+    `Need approximately <b>${fmt(n)}</b> more reviews at avg <b>${mix.toFixed(1)}★</b> to hit <b>${target.toFixed(2)}★</b>` +
+    (weeks ? ` — at your current 90-day pace (~${ratePer90.toFixed(2)}/day) that's about <b>${fmt(weeks)} weeks</b>.` : '.');
 }
 
-/* ------------------------------ bindings ------------------------------- */
-function bind() {
-  $('#btn-refresh').onclick = refreshAll;
-  $('#btn-export').onclick = exportCSV;
-  $('#btn-config').onclick = () => $('#settings-section').style.display === 'none' ? openSettings() : closeSettings();
-  $('#btn-close-settings').onclick = closeSettings;
-  $('#btn-save-settings').onclick = saveSettings;
-  $('#btn-save-snapshot').onclick = saveSnapshotFromForm;
-  $('#btn-test-scraper').onclick = testScraper;
-  $('#btn-setup-save').onclick = saveSetupUrl;
-  $('#btn-export-json').onclick = exportJSON;
-  $('#btn-import').onclick = () => $('#file-import').click();
-  $('#file-import').onchange = e => e.target.files[0] && importJSON(e.target.files[0]);
-  $('#btn-clear').onclick = () => {
-    if (confirm('Delete all snapshots and reset?')) {
-      localStorage.removeItem(STORE_KEY); localStorage.removeItem('pharmRev.v1');
-      location.reload();
-    }
-  };
-  $('#t-calc').onclick = calcTarget;
-  $('#t-target').addEventListener('keydown', e => e.key === 'Enter' && calcTarget());
-  $('#t-mix').addEventListener('keydown', e => e.key === 'Enter' && calcTarget());
+/* ============================= Wiring ================================ */
 
-  $$('#comparison-table th').forEach(th => {
-    th.onclick = () => {
-      const key = th.dataset.sort;
-      if (!key) return;
-      if (sortBy === key) sortDir *= -1; else { sortBy = key; sortDir = -1; }
-      renderTable();
-    };
+function readFile(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.onerror = () => rej(reader.error);
+    reader.readAsText(file);
   });
 }
 
-bind();
-render();
-
-// Auto-refresh on load if scraper is configured and we haven't refreshed today.
-if (state.scraperUrl) {
-  const today = todayKey();
-  const lastDate = state.lastRefresh ? state.lastRefresh.slice(0,10) : '';
-  if (lastDate !== today) setTimeout(refreshAll, 300);
+async function pickFile() {
+  return new Promise((res) => {
+    const input = $('#file-input');
+    input.value = '';
+    input.onchange = () => res(input.files[0] || null);
+    input.click();
+  });
 }
+
+async function onImport() {
+  const file = await pickFile();
+  if (!file) return;
+  try {
+    const text = await readFile(file);
+    const json = JSON.parse(text);
+    importScraperJson(json, file.name);
+  } catch (e) {
+    console.error(e);
+    toast('Import failed: ' + (e.message || e), 'err');
+  }
+}
+
+function onExport() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pharm-review-state-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function onClear() {
+  if (!confirm('Clear all imported review data? Export first if you want a backup.')) return;
+  localStorage.removeItem(STORE_KEY);
+  Object.assign(state, { pharmacyName: '', placeId: '', importedAt: null, reviews: [] });
+  render();
+  toast('Cleared.');
+}
+
+$('#btn-import').onclick = onImport;
+$('#btn-import-2').onclick = onImport;
+$('#btn-export').onclick = onExport;
+$('#btn-clear').onclick = onClear;
+$('#t-calc').onclick = targetCalc;
+
+render();
 </script>
 </body>
 </html>

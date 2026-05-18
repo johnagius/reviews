@@ -1,88 +1,63 @@
 # Pharmacy Review Tracker
 
-Single-page dashboard that auto-tracks your pharmacy's Google rating + review count + 1★–5★ distribution against competitors over time, and tells you exactly how many more 5★ reviews you need to hit a target rating.
+Single-page dashboard that reads a JSON export of your Google reviews and
+turns it into rich statistics, charts, and a precise per-review timeline.
 
-Refresh is fully automated — click one button, the dashboard scrapes every Maps page invisibly via a Cloudflare Worker running real headless Chromium, returns clean JSON, and updates. No copy/paste, no opening tabs.
-
-## How it works
-
-```
-index.html (browser, localStorage)
-       │
-       └──fetch──▶  your Cloudflare Worker  ──▶  headless Chromium
-                          │                          │
-                          │                          ▼
-                          │                    Google Maps place page
-                          │                  (JS hydrates, DOM populates)
-                          ▼                          │
-                    DOM extraction  ◀────────────────┘
-                          │
-                          ▼
-            JSON: { rating, reviewCount, dist }
-```
-
-The Worker is yours, running in your Cloudflare account. The dashboard only talks to your Worker. Nothing else leaves your browser.
-
-## Setup (one-time, ~3 minutes)
-
-### Option A — CLI (recommended)
-
-```bash
-# In the cloned repo:
-npm install
-npx wrangler login        # opens browser, one-time
-npx wrangler deploy       # ships worker.js with the BROWSER binding
-```
-
-`wrangler deploy` prints the live URL (e.g. `https://pharm-scraper.<you>.workers.dev`). Paste it into the dashboard's yellow setup banner → **Save and refresh**.
-
-Your account needs to be on the [Workers Paid plan](https://developers.cloudflare.com/workers/platform/pricing/) ($5/month) for the Browser Rendering binding. The free 10 min/day Browser Rendering quota is plenty for a few pharmacies refreshed weekly.
-
-### Option B — Dashboard (no CLI)
-
-1. <https://dash.cloudflare.com> → **Workers & Pages** → **Create Worker**. Name it (e.g. `pharm-scraper`), deploy the stub.
-2. Open the Worker → **Edit code** → paste `worker.js` from this repo → **Save and deploy**.
-3. Worker → **Settings** → **Bindings** → **Add** → **Browser Rendering**, variable name `BROWSER`.
-4. Copy the deployed URL into the dashboard's setup banner.
-
-## Adding more pharmacies
-
-**Settings** → paste one pharmacy per line, format `name | google-maps-url`. Prefix your own with `*`:
-
-```
-* Potter's Pharmacy St. Julian's | https://www.google.com/maps/place/...
-Competitor A                    | https://www.google.com/maps/place/...
-Competitor B                    | https://www.google.com/maps/place/...
-```
-
-Save. Click **Refresh all**.
+Pure client-side — no server, no scraper to maintain. You drop in a fresh
+JSON whenever you want to refresh; every chart re-renders from the imported
+data.
 
 ## What you get
 
-- **Overview** cards: your rating, total reviews, rank by rating, rank by reviews — all with 7-day deltas.
-- **Comparison table**: sortable, with Δ reviews / Δ rating since 7 days ago.
-- **History chart**: review-count timeline per pharmacy, your pharmacy highlighted gold.
-- **Star distribution**: 1★–5★ bars per pharmacy (extracted automatically when the Worker can open the rating panel).
-- **Target calculator**: "to go from 4.7 → 4.8, you need N more 5★ reviews; at your current pace, that's ~M weeks."
-- **CSV + JSON export**, **JSON import** for migrating between browsers.
+- **Stat cards**: total reviews, average rating, last-30-day and last-90-day
+  velocity, time span (years covered).
+- **Star distribution**: percentage breakdown of 1★–5★.
+- **Cumulative reviews over time**: smooth growth curve, one colored dot per
+  review on the line (hover for date + author + stars).
+- **Reviews per year**: stacked bar chart by star rating.
+- **Average rating over time**: 12-month trailing average line.
+- **Engagement**: percentage of reviews with written text, owner response
+  rate, total likes received, language breakdown.
+- **Top reviewers**: most-liked reviews with excerpts.
+- **Recent reviews**: latest 10 in card form (stars, text, response status).
+- **Target calculator**: "to go from 4.50 → 4.80 at avg incoming 5.0★, you
+  need N more reviews, ~M weeks at current pace."
 
-## Local dev for the Worker (optional)
+## Usage
 
-If you want to iterate on the Worker locally:
+1. Open the dashboard (GitHub Pages site or `index.html` locally).
+2. Click **Import JSON**, pick your scraper output. All charts populate.
+3. Re-import any time to refresh.
+4. **Export JSON** to back up the current state. **Clear** to wipe.
 
-```bash
-npm install -g wrangler
-npm install @cloudflare/puppeteer
-wrangler login
-wrangler dev      # local preview at http://localhost:8787
-wrangler deploy   # ship to production
+A sample dataset is in the repo: `potters_google_reviews.json`.
+
+## Input format
+
+Top-level either a single-key object `{ "hash:<placeId>": [reviews...] }` or
+a plain array. Each review object should have at minimum:
+
+```json
+{
+  "review_id": "...",
+  "author": "...",
+  "rating": 5.0,
+  "review_text": { "en": "..." },
+  "review_date": "2024-03-15T10:00:00+00:00",
+  "raw_date": "1 year ago",
+  "likes": 0,
+  "owner_responses": { "en": { "text": "..." } },
+  "is_deleted": 0
+}
 ```
 
-The bundled `wrangler.toml` already wires the `BROWSER` binding.
+`review_text` can be a `{lang: string}` map, a `{lang: {text: string}}` map,
+or empty. Reviews with `is_deleted == 1` are skipped. The dashboard prefers
+English text when multiple languages are present.
 
-## Notes
+## History
 
-- All snapshots and the pharmacy list live in `localStorage`. Export JSON if you switch devices.
-- The Worker is host-locked to google.com so nobody else can use it as an open scraper.
-- Google's terms allow asking real customers for honest reviews; they don't allow incentives or "5-star only" solicitation. A sudden burst of new-account 5★s is exactly what their spam filter looks for.
-- If you don't want to pay for Workers Paid: open **Settings** → **Manual entry** to type ratings in by hand. The rest of the dashboard (history, comparison, target calc) works either way.
+Earlier versions of this project scraped Google Maps live via a Cloudflare
+Worker running headless Chromium. That approach proved too fragile (Google
+UI changes, IP-based "limited view" serving, Browser Rendering quota costs)
+and was replaced with this JSON-import flow.

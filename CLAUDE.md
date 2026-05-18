@@ -15,16 +15,20 @@ fast-forward it into `main` and push `main`.
 
 ## Project
 
-Single-page dashboard (`index.html`) that compares the owner's pharmacy
-against competitors using public Google Maps data, fetched through a
-Cloudflare Worker (`worker.js`) that runs headless Chromium. State lives
-in `localStorage`.
+Single-page dashboard (`index.html`) — a Google reviews analytics tool for
+the owner's pharmacy. The user imports a JSON file produced by an external
+Google Reviews scraper and the dashboard renders the statistics + timeline +
+charts entirely client-side. State lives in `localStorage`.
+
+The dashboard is self-contained: open `index.html` in a browser, click
+**Import JSON**, every chart updates from the imported review data. No
+server, no scraper, no API calls.
 
 Live files in the repo:
 
 - `index.html` — the dashboard, served by GitHub Pages from `main`
-- `worker.js` — the Cloudflare Worker source
-- `wrangler.toml` + `package.json` — config for `npx wrangler deploy`
+- `potters_google_reviews.json` — sample/current data (the user's actual
+  pharmacy reviews, ~195 reviews with exact ISO dates)
 - `README.md` + `CLAUDE.md` — docs
 
 Keep `index.html` self-contained — no build step, no external runtime deps.
@@ -33,69 +37,52 @@ That's what makes it work as a GitHub Pages site with zero configuration.
 ## User workflow
 
 The user is on **Windows** (`cmd.exe`, e.g. `C:\Users\Potte>` prompt) and
-**does not use git locally**. To redeploy the Worker they:
+**does not use git locally**. The dashboard is purely client-side now —
+they never need to run a deploy, push code, or touch a CLI. The only steps:
 
-1. Download the repo as a zip from GitHub's "Code → Download ZIP" button
-   (URL: `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`)
-2. Extract it in their Downloads folder
-3. Run `npx wrangler deploy` in the unzipped folder
+1. Open the GitHub Pages site (or `index.html` locally) in a browser.
+2. Click **Import JSON** and pick the latest scraper output.
 
-So they DO use a terminal, just not git, and the terminal is Windows
-`cmd.exe`. Don't suggest:
+GitHub Pages auto-serves `index.html` from `main` within ~1 minute of any
+push, so dashboard changes are live without any action from the user. **No
+Worker redeploy. No `wrangler deploy`. No `npm install`.** Don't suggest any
+of those.
 
-- `git pull` / `git clone` — they download fresh zips
-- Unix-only syntax: `~/Downloads`, `unzip`, `&&` chains, single-quoted
-  strings — none of these work in `cmd.exe`
-- `bash` script blocks — give plain `cmd.exe` commands
+After every commit that touches `index.html`, end the reply with a short
+"Hard-refresh the dashboard (Ctrl+Shift+R) once GitHub Pages serves the new
+build (~1 min)". Don't include any deploy or CLI commands.
 
-Keep `wrangler.toml` and `package.json` intact; without them,
-`wrangler deploy` won't work.
+## Input JSON schema
 
-## After updating `worker.js`
+The dashboard accepts JSON in this shape (produced by the external scraper):
 
-GitHub Pages auto-serves `index.html` from `main` within a minute of every
-push, so dashboard changes need no user action. The Cloudflare Worker is
-different — it does **not** auto-redeploy from this repo, so the user has
-to push it manually.
+```json
+{
+  "hash:<placeId>": [
+    {
+      "review_id": "...",
+      "author": "...",
+      "rating": 5.0,
+      "review_text": { "en": "..." } | { "en": { "text": "..." } } | {},
+      "review_date": "2024-03-15T10:00:00+00:00",
+      "raw_date": "1 year ago",
+      "likes": 0,
+      "owner_responses": { "en": { "text": "..." } } | {},
+      "is_deleted": 0,
+      "profile_url": "..."
+    }
+  ]
+}
+```
 
-After every commit that touches `worker.js`, `wrangler.toml`, or
-`package.json`, end the reply with:
+The top-level can also be a plain array of reviews (no wrapper key). Reviews
+with `is_deleted == 1` are skipped. Only `review_date`, `rating`, and `author`
+are strictly required.
 
-1. The zip download link for the current `main`:
-   `https://github.com/johnagius/reviews/archive/refs/heads/main.zip`
-2. A complete copy-pasteable Windows `cmd.exe` block. Always
-   `curl`-download the zip fresh rather than telling them to click the
-   GitHub link — browsers will serve a stale cached zip and silently
-   redeploy the previous code, which has burned us before:
-   ```
-   cd %USERPROFILE%\Downloads
-   del reviews-main.zip
-   rmdir /S /Q reviews-main
-   curl -L -o reviews-main.zip https://github.com/johnagius/reviews/archive/refs/heads/main.zip
-   tar -xf reviews-main.zip
-   cd reviews-main
-   npm install
-   npx wrangler deploy
-   ```
-   Windows 10+ ships `curl` and `tar` built in. `del`/`rmdir` print
-   "could not find" the first time, which is harmless. `curl -L`
-   follows GitHub's 302 to codeload.github.com.
+## History
 
-   **`npm install` is required**, not optional: wrangler bundles
-   `worker.js` and needs `@cloudflare/puppeteer` resolvable from
-   `node_modules`, otherwise the build fails with
-   `Could not resolve "@cloudflare/puppeteer"`. Since the user
-   re-extracts a fresh zip each time, `node_modules` may not persist,
-   so re-run `npm install` every redeploy.
-
-   On the very first deploy, `npx wrangler` will also prompt
-   `Ok to proceed? (y)` to install wrangler itself, and then open a
-   browser to log into Cloudflare. Tell the user to press `y` + Enter
-   at the prompt — multi-line paste at that point sends the next
-   command as the prompt answer and cancels the install.
-3. A reminder that until they run that block, the dashboard still hits
-   the old Worker code.
-
-If a commit touches **only** `index.html` (or other files that aren't
-Worker-related), say so explicitly and tell the user no Worker redeploy
-is needed — GitHub Pages handles it.
+This project used to scrape Google Maps via a Cloudflare Worker running
+headless Chromium. That was abandoned in favour of the external-scraper +
+JSON-import flow because the scraping was fragile, expensive in Browser
+Rendering minutes, and routinely broken by Google's UI changes / limited-view
+serving. The Worker code is in git history if anyone wants to resurrect it.
