@@ -175,10 +175,10 @@
   </section>
 
   <section id="setup-banner" class="setup" style="display:none">
-    <h2>Get started — import your Google reviews JSON</h2>
+    <h2>Nothing in the shared database yet — import a Google reviews JSON</h2>
     <p class="small" style="margin-top:0">
       Drop in a JSON file from the Google Reviews scraper (the format with <code>review_id</code>, <code>review_date</code>, <code>rating</code>, etc.).
-      Every chart below populates from it instantly. Re-import any time to refresh. Use <b>Import competitor</b> to layer in rivals for side-by-side stats and timelines.
+      It uploads to the shared Cloudflare D1 database so every teammate sees it instantly. Re-importing a pharmacy wipes its old reviews and replaces them atomically. Use <b>Import competitor</b> to layer in rivals.
     </p>
     <div class="row" style="margin-top:6px">
       <button class="primary" id="btn-import-2">Choose JSON file…</button>
@@ -435,7 +435,8 @@
   </section>
 
   <div class="footer-note">
-    All data lives in <code>localStorage</code>. Use Import JSON to load the latest scraper output, Export JSON to back up the current state, Clear to wipe and start fresh.
+    Imported pharmacies + reviews live in a shared Cloudflare D1 database — every viewer of this dashboard sees the same data. Re-importing a pharmacy replaces its reviews atomically.
+    Your personal preferences (hidden competitors, milestone filter, goals) stay in this browser's <code>localStorage</code>.
   </div>
 </main>
 
@@ -458,52 +459,119 @@
    }
    ------------------------------------------------------------------------- */
 
-const STORE_KEY = 'pharmRev.v4';
+// ---------------------------------------------------------------------
+// CONFIGURE ME — set these once after deploying the Worker.
+// ---------------------------------------------------------------------
+// API_BASE: the deployed Worker URL printed by `npx wrangler deploy`.
+//   Example: 'https://pharm-api.your-subdomain.workers.dev'
+// API_TOKEN: the value you set via `npx wrangler secret put PHARM_TOKEN`.
+//   This is embedded in the HTML and visible to anyone reading the
+//   source. It only stops casual write abuse, not a determined attacker.
+const API_BASE  = 'https://pharm-api.YOUR-SUBDOMAIN.workers.dev';
+const API_TOKEN = 'PASTE-YOUR-PHARM_TOKEN-SECRET-HERE';
+
+// Old single-blob key (v3, v4). Reviews + competitors now live in D1.
+// localStorage keeps only per-user UI prefs.
+const STORE_KEY     = 'pharmRev.v4';
+const PREFS_KEY     = 'pharmRev.prefs';
+const MIGRATED_KEY  = 'pharmRev.migratedAt';
 
 const $  = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
 const ns = 'http://www.w3.org/2000/svg';
 
-function load() {
+function loadPrefs() {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
+    const raw = localStorage.getItem(PREFS_KEY);
     if (raw) {
-      const s = JSON.parse(raw);
-      if (!Array.isArray(s.competitors)) s.competitors = [];
-      if (!Array.isArray(s.hidden)) s.hidden = [];
-      if (typeof s.milestoneFilter !== 'string') s.milestoneFilter = 'all';
-      if (typeof s.milestoneScope !== 'string') s.milestoneScope = 'all';
-      if (typeof s.lastViewedAt !== 'string' && s.lastViewedAt !== null) s.lastViewedAt = null;
-      if (!s.goals || typeof s.goals !== 'object') s.goals = { count: null, rating: null };
-      return s;
-    }
-    // Migrate v3 (single-pharmacy) into v4 (own + competitors).
-    const v3raw = localStorage.getItem('pharmRev.v3');
-    if (v3raw) {
-      const v3 = JSON.parse(v3raw);
+      const p = JSON.parse(raw);
       return {
-        pharmacyName: v3.pharmacyName || '',
-        placeId: v3.placeId || '',
-        importedAt: v3.importedAt || null,
-        reviews: v3.reviews || [],
-        competitors: [],
-        hidden: [],
-        milestoneFilter: 'all',
-        milestoneScope: 'all',
-        lastViewedAt: null,
-        goals: { count: null, rating: null },
+        hidden: Array.isArray(p.hidden) ? p.hidden : [],
+        milestoneFilter: typeof p.milestoneFilter === 'string' ? p.milestoneFilter : 'all',
+        milestoneScope: typeof p.milestoneScope === 'string' ? p.milestoneScope : 'all',
+        lastViewedAt: typeof p.lastViewedAt === 'string' ? p.lastViewedAt : null,
+        goals: (p.goals && typeof p.goals === 'object')
+          ? { count: Number.isFinite(p.goals.count) ? p.goals.count : null,
+              rating: Number.isFinite(p.goals.rating) ? p.goals.rating : null }
+          : { count: null, rating: null },
+      };
+    }
+    // Fall back to old single-blob v4 prefs if a fresh user has them.
+    const v4raw = localStorage.getItem(STORE_KEY);
+    if (v4raw) {
+      const v4 = JSON.parse(v4raw);
+      return {
+        hidden: Array.isArray(v4.hidden) ? v4.hidden : [],
+        milestoneFilter: typeof v4.milestoneFilter === 'string' ? v4.milestoneFilter : 'all',
+        milestoneScope: typeof v4.milestoneScope === 'string' ? v4.milestoneScope : 'all',
+        lastViewedAt: typeof v4.lastViewedAt === 'string' ? v4.lastViewedAt : null,
+        goals: (v4.goals && typeof v4.goals === 'object')
+          ? { count: Number.isFinite(v4.goals.count) ? v4.goals.count : null,
+              rating: Number.isFinite(v4.goals.rating) ? v4.goals.rating : null }
+          : { count: null, rating: null },
       };
     }
   } catch (e) {}
-  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [],
-           competitors: [], hidden: [], milestoneFilter: 'all', milestoneScope: 'all',
+  return { hidden: [], milestoneFilter: 'all', milestoneScope: 'all',
            lastViewedAt: null, goals: { count: null, rating: null } };
 }
-function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-const state = load();
+function savePrefs() {
+  const p = {
+    hidden: state.hidden, milestoneFilter: state.milestoneFilter,
+    milestoneScope: state.milestoneScope, lastViewedAt: state.lastViewedAt,
+    goals: state.goals,
+  };
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch (e) {}
+}
+// Old write callsites still call save() — alias preserves them.
+const save = savePrefs;
+
+// State has two halves now:
+//   shared (loaded from API): pharmacyName, placeId, importedAt, reviews, competitors
+//   local (loaded from prefs): hidden, milestoneFilter, milestoneScope, lastViewedAt, goals
+const state = Object.assign(
+  { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [] },
+  loadPrefs()
+);
+
 // Capture once at script load — used by renderWhatsNew so the section
 // doesn't empty itself on the second render after import.
 const previousLastViewedAt = state.lastViewedAt;
+
+// ------------------------- API helpers -------------------------
+function apiConfigured() {
+  return !!(API_BASE && !API_BASE.includes('YOUR-SUBDOMAIN') && !API_TOKEN.startsWith('PASTE-'));
+}
+
+async function apiFetch(path, opts = {}) {
+  if (!apiConfigured()) throw new Error('API not configured — edit index.html to set API_BASE and API_TOKEN.');
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  const method = opts.method || 'GET';
+  if (method !== 'GET') headers['X-Pharm-Token'] = API_TOKEN;
+  const res = await fetch(API_BASE.replace(/\/+$/, '') + path, {
+    method, headers, cache: 'no-store',
+    body: opts.body || undefined,
+  });
+  if (!res.ok) {
+    let msg;
+    try { const b = await res.json(); msg = b.error || `HTTP ${res.status}`; }
+    catch { msg = `HTTP ${res.status}`; }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function loadFromApi() {
+  const data = await apiFetch('/state');
+  const mine = data.pharmacies.find(p => p.isMine) || null;
+  state.pharmacyName = mine ? mine.name : '';
+  state.placeId      = mine ? mine.placeId : '';
+  state.importedAt   = mine ? mine.importedAt : null;
+  state.reviews      = mine ? (mine.reviews || []) : [];
+  state.competitors  = data.pharmacies.filter(p => !p.isMine).map(p => ({
+    name: p.name, placeId: p.placeId, importedAt: p.importedAt, reviews: p.reviews || [],
+  }));
+}
 
 function toast(msg, kind='') {
   const t = document.createElement('div');
@@ -597,43 +665,47 @@ function parseScraperJson(json) {
   return { placeId, reviews };
 }
 
-function importScraperJson(json, fileName, target = 'mine') {
+async function importScraperJson(json, fileName, target = 'mine') {
   const { placeId, reviews } = parseScraperJson(json);
   const name = inferName(reviews, fileName);
-
-  if (target === 'mine') {
-    state.placeId = placeId;
-    state.pharmacyName = name;
-    state.importedAt = new Date().toISOString();
-    state.reviews = reviews;
-    toast(`Imported ${reviews.length} reviews as your pharmacy`, 'good');
-  } else {
-    if (!Array.isArray(state.competitors)) state.competitors = [];
-    // Refuse to add as a competitor if it duplicates the user's own.
-    if (placeId && state.placeId && placeId === state.placeId) {
-      toast(`That JSON matches your own pharmacy's place ID — use "Import mine" instead.`, 'err');
-      return;
-    }
-    const idx = state.competitors.findIndex(c => placeId && c.placeId === placeId);
-    const comp = { name, placeId, importedAt: new Date().toISOString(), reviews };
-    if (idx >= 0) {
-      state.competitors[idx] = comp;
-      toast(`Updated competitor ${name} (${reviews.length} reviews)`, 'good');
-    } else {
-      state.competitors.push(comp);
-      toast(`Added competitor ${name} (${reviews.length} reviews)`, 'good');
-    }
+  if (target === 'competitor' && state.placeId && placeId === state.placeId) {
+    toast(`That JSON matches your own pharmacy's place ID — use "Import mine" instead.`, 'err');
+    return;
   }
-  save();
-  render();
+  setBusy(`Uploading ${reviews.length} reviews for ${name}…`);
+  try {
+    await apiFetch('/import', {
+      method: 'POST',
+      body: JSON.stringify({
+        placeId, name,
+        isMine: target === 'mine',
+        importedAt: new Date().toISOString(),
+        reviews,
+      }),
+    });
+    await loadFromApi();
+    render();
+    toast(target === 'mine'
+      ? `Imported ${reviews.length} reviews as your pharmacy`
+      : `Stored ${reviews.length} reviews for ${name}`, 'good');
+  } catch (e) {
+    toast('Import failed: ' + (e.message || e), 'err');
+  } finally {
+    setBusy(null);
+  }
 }
 
-function removeCompetitor(placeId) {
-  const before = state.competitors.length;
-  state.competitors = state.competitors.filter(c => c.placeId !== placeId);
-  if (state.competitors.length !== before) {
-    save();
+async function removeCompetitor(placeId) {
+  setBusy('Removing…');
+  try {
+    await apiFetch('/pharmacy/' + encodeURIComponent(placeId), { method: 'DELETE' });
+    await loadFromApi();
     render();
+    toast('Competitor removed.', 'good');
+  } catch (e) {
+    toast('Remove failed: ' + (e.message || e), 'err');
+  } finally {
+    setBusy(null);
   }
 }
 
@@ -2629,12 +2701,19 @@ function onExport() {
   URL.revokeObjectURL(url);
 }
 
-function onClear() {
-  if (!confirm('Clear all imported data (your pharmacy AND all competitors)? Export first if you want a backup.')) return;
-  localStorage.removeItem(STORE_KEY);
-  Object.assign(state, { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [] });
-  render();
-  toast('Cleared.');
+async function onClear() {
+  if (!confirm('Clear ALL imported data from the shared D1 database (your pharmacy + every competitor)?\n\nThis affects every viewer of this dashboard. Export first if you want a backup.')) return;
+  setBusy('Clearing…');
+  try {
+    await apiFetch('/clear', { method: 'POST' });
+    await loadFromApi();
+    render();
+    toast('Cleared.');
+  } catch (e) {
+    toast('Clear failed: ' + (e.message || e), 'err');
+  } finally {
+    setBusy(null);
+  }
 }
 
 $('#btn-import').onclick = () => onImport('mine');
@@ -2678,7 +2757,101 @@ $('#goal-rating-clear').onclick = () => {
   state.goals.rating = null; save(); renderGoals(stats());
 };
 
-render();
+// ----------------------- Boot / busy / error UI -----------------------
+
+function setBusy(label) {
+  let bar = $('#busy-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'busy-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:6px 14px;background:var(--accent);color:white;font-size:12.5px;font-weight:600;text-align:center;z-index:9999;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+    document.body.appendChild(bar);
+  }
+  if (label) { bar.textContent = label; bar.style.display = 'block'; }
+  else { bar.style.display = 'none'; }
+}
+
+function showApiError(msg) {
+  $('#headline-section').style.display = 'none';
+  $('#whatsnew-section').style.display = 'none';
+  $('#dash').style.display = 'none';
+  const banner = $('#setup-banner');
+  banner.style.display = '';
+  banner.innerHTML = `
+    <h2 style="color:var(--bad)">Couldn't reach the D1 API</h2>
+    <p class="small">${escapeHtml(msg)}</p>
+    <p class="small">If you haven't set this up yet, edit <code>index.html</code> and set
+      <code>API_BASE</code> to your deployed Worker URL and <code>API_TOKEN</code> to the
+      secret you put with <code>npx wrangler secret put PHARM_TOKEN</code>. Setup steps
+      are in <code>README.md</code>.</p>
+    <div class="row" style="margin-top:8px"><button class="primary" id="btn-retry">Retry</button></div>
+  `;
+  $('#btn-retry').onclick = () => boot();
+}
+
+// Auto-migrate per-browser localStorage data → D1 on first boot, only
+// when D1 is empty and migration hasn't been recorded yet.
+async function maybeAutoMigrate() {
+  if (localStorage.getItem(MIGRATED_KEY)) return false;
+  const v4raw = localStorage.getItem(STORE_KEY);
+  if (!v4raw) { localStorage.setItem(MIGRATED_KEY, nowISO()); return false; }
+  let v4;
+  try { v4 = JSON.parse(v4raw); } catch { localStorage.setItem(MIGRATED_KEY, nowISO()); return false; }
+  const hasMine = v4 && Array.isArray(v4.reviews) && v4.reviews.length > 0;
+  const comps   = v4 && Array.isArray(v4.competitors) ? v4.competitors : [];
+  const hasComp = comps.some(c => c && Array.isArray(c.reviews) && c.reviews.length > 0);
+  if (!hasMine && !hasComp) { localStorage.setItem(MIGRATED_KEY, nowISO()); return false; }
+
+  const total = (hasMine ? v4.reviews.length : 0)
+    + comps.reduce((a, c) => a + ((c && c.reviews && c.reviews.length) || 0), 0);
+  setBusy(`Migrating ${total} reviews from this browser to D1…`);
+
+  if (hasMine && v4.placeId) {
+    await apiFetch('/import', { method: 'POST', body: JSON.stringify({
+      placeId: v4.placeId,
+      name: v4.pharmacyName || 'My Pharmacy',
+      isMine: true,
+      importedAt: v4.importedAt || nowISO(),
+      reviews: v4.reviews,
+    })});
+  }
+  for (const c of comps) {
+    if (!c || !c.placeId || !Array.isArray(c.reviews) || !c.reviews.length) continue;
+    await apiFetch('/import', { method: 'POST', body: JSON.stringify({
+      placeId: c.placeId,
+      name: c.name || 'Competitor',
+      isMine: false,
+      importedAt: c.importedAt || nowISO(),
+      reviews: c.reviews,
+    })});
+  }
+  localStorage.setItem(MIGRATED_KEY, nowISO());
+  toast(`Migrated ${total} reviews to D1.`, 'good');
+  return true;
+}
+
+async function boot() {
+  if (!apiConfigured()) {
+    showApiError('API_BASE / API_TOKEN haven\'t been configured yet.');
+    return;
+  }
+  setBusy('Loading from D1…');
+  try {
+    await loadFromApi();
+    // Auto-migrate only if D1 has no pharmacies at all and we have local data.
+    if (!state.reviews.length && !state.competitors.length) {
+      const migrated = await maybeAutoMigrate();
+      if (migrated) await loadFromApi();
+    }
+    render();
+  } catch (e) {
+    showApiError(e.message || String(e));
+  } finally {
+    setBusy(null);
+  }
+}
+
+boot();
 </script>
 </body>
 </html>

@@ -1,0 +1,16 @@
+name = "pharm-api"
+main = "worker-api.js"
+compatibility_date = "2024-09-23"
+
+# D1 database — create it once with:
+#   npx wrangler d1 create pharm-reviews
+# then paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "pharm-reviews"
+database_id = "PASTE-DATABASE-ID-FROM-WRANGLER-D1-CREATE"
+
+# PHARM_TOKEN is a secret, not a [vars] entry. Set it once with:
+#   npx wrangler secret put PHARM_TOKEN
+# and paste a long random string when prompted. The dashboard sends
+# this same string in the X-Pharm-Token header on every write.

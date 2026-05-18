@@ -1,0 +1,14 @@
+{
+  "name": "pharm-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker + D1 backend for the Pharmacy Review Tracker dashboard.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute pharm-reviews --remote --file=./migrations/0001_init.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  }
+}
