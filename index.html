@@ -216,6 +216,12 @@
               <option value="rating">All rating events (overtakings + thresholds)</option>
             </select>
           </label>
+          <label class="small muted">Pharmacies
+            <select id="milestone-scope" style="margin-left:6px">
+              <option value="all">All pharmacies</option>
+              <option value="mine">My pharmacy only</option>
+            </select>
+          </label>
           <span class="muted small" id="milestone-count"></span>
         </div>
         <div id="milestones-list"></div>
@@ -366,6 +372,7 @@ function load() {
       if (!Array.isArray(s.competitors)) s.competitors = [];
       if (!Array.isArray(s.hidden)) s.hidden = [];
       if (typeof s.milestoneFilter !== 'string') s.milestoneFilter = 'all';
+      if (typeof s.milestoneScope !== 'string') s.milestoneScope = 'all';
       return s;
     }
     // Migrate v3 (single-pharmacy) into v4 (own + competitors).
@@ -383,7 +390,7 @@ function load() {
     }
   } catch (e) {}
   return { pharmacyName: '', placeId: '', importedAt: null, reviews: [],
-           competitors: [], hidden: [], milestoneFilter: 'all' };
+           competitors: [], hidden: [], milestoneFilter: 'all', milestoneScope: 'all' };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 const state = load();
@@ -1077,6 +1084,7 @@ function buildMilestones(pharmacies) {
           t: new Date(r.date).getTime(),
           kind: 'milestone',
           color: p.color,
+          subjects: [p.placeId],
           html: `<b>${escapeHtml(p.name)}</b> hit <b>${n}</b> reviews`,
         });
       }
@@ -1100,14 +1108,14 @@ function buildMilestones(pharmacies) {
           if (prev < tier && cur >= tier && !reachedUp.has(tier)) {
             reachedUp.add(tier);
             events.push({
-              t: tMs, kind: 'rating-up', color: p.color,
+              t: tMs, kind: 'rating-up', color: p.color, subjects: [p.placeId],
               html: `<b>${escapeHtml(p.name)}</b> crossed <b>${tier.toFixed(1)}★</b> trailing 12-mo`,
             });
           }
           if (prev >= tier && cur < tier && reachedUp.has(tier) && !reachedDown.has(tier)) {
             reachedDown.add(tier);
             events.push({
-              t: tMs, kind: 'rating-down', color: p.color,
+              t: tMs, kind: 'rating-down', color: p.color, subjects: [p.placeId],
               html: `<b>${escapeHtml(p.name)}</b> slipped below <b>${tier.toFixed(1)}★</b> trailing 12-mo`,
             });
           }
@@ -1144,6 +1152,7 @@ function buildMilestones(pharmacies) {
           const lC = sign > 0 ? cb : ca;
           events.push({
             t, kind: 'count-cross', color: winner.color,
+            subjects: [winner.placeId, loser.placeId],
             html: `<b>${escapeHtml(winner.name)}</b> overtook <b>${escapeHtml(loser.name)}</b> in review count (${wC} vs ${lC})`,
           });
         }
@@ -1172,6 +1181,7 @@ function buildMilestones(pharmacies) {
           const lR = sign > 0 ? rb : ra;
           events.push({
             t: tMs, kind: 'rating-cross', color: winner.color,
+            subjects: [winner.placeId, loser.placeId],
             html: `<b>${escapeHtml(winner.name)}</b> overtook <b>${escapeHtml(loser.name)}</b> in 12-mo avg rating (${wR.toFixed(2)}★ vs ${lR.toFixed(2)}★)`,
           });
         }
@@ -1218,12 +1228,24 @@ function renderMilestones(pharmacies) {
     return;
   }
 
-  // Sync the dropdown to whatever's persisted, then filter.
+  // Sync the dropdowns to whatever's persisted, then filter.
   const filter = (state.milestoneFilter && KIND_GROUPS[state.milestoneFilter])
     ? state.milestoneFilter : 'all';
   filterSel.value = filter;
+  const scope = (state.milestoneScope === 'mine') ? 'mine' : 'all';
+  const scopeSel = $('#milestone-scope');
+  scopeSel.value = scope;
+  // Hide "My pharmacy only" if the user hasn't imported their own data yet.
+  const mineOpt = scopeSel.querySelector('option[value="mine"]');
+  if (mineOpt) {
+    mineOpt.disabled = !state.placeId;
+    if (state.pharmacyName) mineOpt.textContent = `${state.pharmacyName} only`;
+  }
   const pred = KIND_GROUPS[filter];
-  const filtered = events.filter(e => pred(e.kind));
+  const myId = state.placeId;
+  const scoped = e => scope === 'all'
+    || (Array.isArray(e.subjects) && myId && e.subjects.includes(myId));
+  const filtered = events.filter(e => pred(e.kind) && scoped(e));
   countLine.textContent = filtered.length === events.length
     ? `${events.length} events`
     : `${filtered.length} of ${events.length} events`;
@@ -1919,14 +1941,21 @@ $('#btn-export').onclick = onExport;
 $('#btn-clear').onclick = onClear;
 $('#t-calc').onclick = targetCalc;
 $('#p-calc').onclick = projectionCalc;
-$('#milestone-filter').onchange = (e) => {
-  state.milestoneFilter = e.target.value;
-  save();
-  // Only the milestones list needs to update on filter change.
+function refreshMilestones() {
   const pharmacies = comparedPharmacies();
   pharmacies.forEach((p, i) => { p.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]; });
   const hidden = new Set(state.hidden || []);
   renderMilestones(pharmacies.filter(p => !hidden.has(p.placeId)));
+}
+$('#milestone-filter').onchange = (e) => {
+  state.milestoneFilter = e.target.value;
+  save();
+  refreshMilestones();
+};
+$('#milestone-scope').onchange = (e) => {
+  state.milestoneScope = e.target.value;
+  save();
+  refreshMilestones();
 };
 
 render();
