@@ -204,6 +204,20 @@
         <div class="legend" id="legend-compare-rating"></div>
 
         <h2 style="margin-top:16px">Milestones &amp; crossovers <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(auto-detected events in chronological order)</span></h2>
+        <div class="row" style="margin-bottom:10px">
+          <label class="small muted">Show
+            <select id="milestone-filter" style="margin-left:6px">
+              <option value="all">All events</option>
+              <option value="overtake">Overtakings only (count + rating)</option>
+              <option value="count-cross">Count overtakings only</option>
+              <option value="rating-cross">Rating overtakings only</option>
+              <option value="milestone">Review-count milestones only</option>
+              <option value="threshold">Rating thresholds only (up/down)</option>
+              <option value="rating">All rating events (overtakings + thresholds)</option>
+            </select>
+          </label>
+          <span class="muted small" id="milestone-count"></span>
+        </div>
         <div id="milestones-list"></div>
 
         <h2 style="margin-top:16px">Loaded competitors</h2>
@@ -351,6 +365,7 @@ function load() {
       const s = JSON.parse(raw);
       if (!Array.isArray(s.competitors)) s.competitors = [];
       if (!Array.isArray(s.hidden)) s.hidden = [];
+      if (typeof s.milestoneFilter !== 'string') s.milestoneFilter = 'all';
       return s;
     }
     // Migrate v3 (single-pharmacy) into v4 (own + competitors).
@@ -367,7 +382,8 @@ function load() {
       };
     }
   } catch (e) {}
-  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [], hidden: [] };
+  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [],
+           competitors: [], hidden: [], milestoneFilter: 'all' };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 const state = load();
@@ -1176,9 +1192,22 @@ const KIND_LABELS = {
   'rating-down':  'rating down',
 };
 
+const KIND_GROUPS = {
+  'all':          () => true,
+  'overtake':     k => k === 'count-cross' || k === 'rating-cross',
+  'count-cross':  k => k === 'count-cross',
+  'rating-cross': k => k === 'rating-cross',
+  'milestone':    k => k === 'milestone',
+  'threshold':    k => k === 'rating-up' || k === 'rating-down',
+  'rating':       k => k === 'rating-cross' || k === 'rating-up' || k === 'rating-down',
+};
+
 function renderMilestones(pharmacies) {
   const wrap = $('#milestones-list');
+  const countLine = $('#milestone-count');
+  const filterSel = $('#milestone-filter');
   wrap.innerHTML = '';
+  countLine.textContent = '';
   if (pharmacies.length < 2) {
     wrap.innerHTML = '<div class="muted small">Add more pharmacies to see crossovers between them.</div>';
     return;
@@ -1188,9 +1217,25 @@ function renderMilestones(pharmacies) {
     wrap.innerHTML = '<div class="muted small">No milestones detected yet.</div>';
     return;
   }
+
+  // Sync the dropdown to whatever's persisted, then filter.
+  const filter = (state.milestoneFilter && KIND_GROUPS[state.milestoneFilter])
+    ? state.milestoneFilter : 'all';
+  filterSel.value = filter;
+  const pred = KIND_GROUPS[filter];
+  const filtered = events.filter(e => pred(e.kind));
+  countLine.textContent = filtered.length === events.length
+    ? `${events.length} events`
+    : `${filtered.length} of ${events.length} events`;
+
+  if (!filtered.length) {
+    wrap.innerHTML = '<div class="muted small">No events match this filter.</div>';
+    return;
+  }
+
   // Newest first reads more naturally for a "what just happened" view.
-  events.reverse();
-  for (const e of events) {
+  filtered.reverse();
+  for (const e of filtered) {
     const d = new Date(e.t);
     const dateStr = d.toLocaleString('en', { month: 'short', year: 'numeric' });
     const row = document.createElement('div');
@@ -1874,6 +1919,15 @@ $('#btn-export').onclick = onExport;
 $('#btn-clear').onclick = onClear;
 $('#t-calc').onclick = targetCalc;
 $('#p-calc').onclick = projectionCalc;
+$('#milestone-filter').onchange = (e) => {
+  state.milestoneFilter = e.target.value;
+  save();
+  // Only the milestones list needs to update on filter change.
+  const pharmacies = comparedPharmacies();
+  pharmacies.forEach((p, i) => { p.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]; });
+  const hidden = new Set(state.hidden || []);
+  renderMilestones(pharmacies.filter(p => !hidden.has(p.placeId)));
+};
 
 render();
 </script>
