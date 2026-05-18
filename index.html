@@ -1192,7 +1192,23 @@ function renderCompare(pharmaciesArg, allStatsArg, eventsArg) {
 
 /* ---------- Podium (top of competitor comparison) ---------- */
 function renderPodium(visible, allStats) {
-  const fillSection = (containerId, key, formatter) => {
+  const PRIOR_N = 50, PRIOR_MEAN = 4.0;
+  const myRate = rate90(state.reviews);  // per-day
+
+  // How many "all-5★" reviews do I need to leapfrog a competitor's Bayesian?
+  // Same Bayesian formula as the rating-goal calculator, solved for N.
+  function fiveStarsToOvertakeBayes(myS, targetBayes) {
+    const tgt = targetBayes + 0.005;          // a hair past
+    if (tgt >= 5) return Infinity;
+    const sumStars = myS.avg * myS.total;
+    const N = (tgt * (myS.total + PRIOR_N) - sumStars - PRIOR_N * PRIOR_MEAN) / (5 - tgt);
+    return Math.max(0, Math.ceil(N));
+  }
+  function countToOvertake(myS, targetCount) {
+    return Math.max(0, targetCount - myS.total + 1);
+  }
+
+  const fillSection = (containerId, key, type) => {
     const container = $(containerId);
     container.innerHTML = '';
     if (!visible.length) return;
@@ -1206,15 +1222,56 @@ function renderPodium(visible, allStats) {
       const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉');
       const card = document.createElement('div');
       card.className = `stat ${podiumCls}${mineCls}`;
+
+      const baseSub = type === 'count'
+        ? `${fmt(s.total)} reviews`
+        : `${s.bayes.toFixed(2)}★ Bayesian · ${s.avg.toFixed(2)}★ raw`;
+
+      // On the user's own card, when not 1st, list each ranked-above
+      // competitor with the lift needed to leapfrog them.
+      let climbHtml = '';
+      if (p.isMine && i > 0) {
+        const lines = [];
+        for (let j = 0; j < i; j++) {
+          const t = sorted[j];
+          if (type === 'count') {
+            const need = countToOvertake(s, t.s.total);
+            const etaDays = myRate > 0 ? need / myRate : null;
+            const eta = etaDays != null
+              ? ` <span class="muted">(~${formatDuration(etaDays)} at current pace)</span>`
+              : '';
+            lines.push(`To pass <b>${escapeHtml(t.p.name)}</b>: <b>+${fmt(need)}</b> reviews${eta}`);
+          } else {
+            const need = fiveStarsToOvertakeBayes(s, t.s.bayes);
+            if (!Number.isFinite(need)) {
+              lines.push(`To pass <b>${escapeHtml(t.p.name)}</b>: unreachable (their Bayesian is already at the 5★ ceiling).`);
+            } else {
+              const future5pct = ((s.dist[4] + need) / (s.total + need) * 100).toFixed(0);
+              const etaDays = myRate > 0 ? need / myRate : null;
+              const eta = etaDays != null
+                ? ` <span class="muted">(~${formatDuration(etaDays)} if every new review is 5★)</span>`
+                : '';
+              lines.push(
+                `To pass <b>${escapeHtml(t.p.name)}</b> (${t.s.bayes.toFixed(2)}★): ` +
+                `<b>+${fmt(need)} × 5★</b> — your 5★ share would climb to <b>${future5pct}%</b>${eta}`
+              );
+            }
+          }
+        }
+        climbHtml =
+          `<div class="muted small" style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--line); line-height:1.7">` +
+          lines.join('<br>') + `</div>`;
+      }
+
       card.innerHTML =
         `<div class="label">${medal} ${i + 1}${i === 0 ? 'st' : (i === 1 ? 'nd' : 'rd')} place</div>` +
         `<div class="value" style="font-size:18px"><span style="color:${p.color}">●</span> ${escapeHtml(p.name)}${p.isMine ? ' <span class="muted small">(you)</span>' : ''}</div>` +
-        `<div class="sub">${formatter(s)}</div>`;
+        `<div class="sub">${baseSub}</div>` + climbHtml;
       container.appendChild(card);
     });
   };
-  fillSection('#podium-count', 'total', s => `${fmt(s.total)} reviews`);
-  fillSection('#podium-bayes', 'bayes', s => `${s.bayes.toFixed(2)}★ Bayesian · ${s.avg.toFixed(2)}★ raw`);
+  fillSection('#podium-count', 'total', 'count');
+  fillSection('#podium-bayes', 'bayes', 'bayes');
 }
 
 /* ---------- ETA-to-overtake cards (per visible competitor) ---------- */
