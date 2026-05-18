@@ -99,6 +99,21 @@
   .review-card .when { color: var(--muted); font-size: 11.5px; margin-left: auto; }
   .review-card .text { font-size: 13px; line-height: 1.5; }
   .review-card .meta { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .milestone { display: grid; grid-template-columns: 110px 14px 1fr;
+    gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); align-items: start; }
+  .milestone:last-child { border-bottom: none; }
+  .milestone-date { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .milestone-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; }
+  .milestone-text { font-size: 13px; line-height: 1.4; }
+  .milestone-text b { font-weight: 600; }
+  .milestone-text .tag { display: inline-block; padding: 0 6px; border-radius: 9px;
+    font-size: 10.5px; border: 1px solid var(--line); color: var(--muted); margin-left: 6px; }
+  .chip { background: var(--panel-2); border: 1px solid var(--line); border-radius: 18px;
+    padding: 5px 11px; font-size: 12px; cursor: pointer; display: inline-flex;
+    align-items: center; gap: 6px; color: var(--text); }
+  .chip:hover { border-color: var(--accent); }
+  .chip.off { opacity: 0.35; text-decoration: line-through; }
+  .chip-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 </style>
 </head>
 <body>
@@ -160,6 +175,7 @@
         No competitors imported yet. Click <b>Import competitor</b> in the header to add one — comparison stats and timelines appear here.
       </div>
       <div id="competitors-wrap" style="display:none">
+        <div class="row" id="compare-toggles" style="margin-bottom:10px"></div>
         <table id="compare-table">
           <thead><tr>
             <th>Pharmacy</th>
@@ -186,6 +202,9 @@
         <h2 style="margin-top:16px">Average rating over time — all pharmacies <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(12-month trailing average)</span></h2>
         <svg class="chart" id="chart-compare-rating" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
         <div class="legend" id="legend-compare-rating"></div>
+
+        <h2 style="margin-top:16px">Milestones &amp; crossovers <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(auto-detected events in chronological order)</span></h2>
+        <div id="milestones-list"></div>
 
         <h2 style="margin-top:16px">Loaded competitors</h2>
         <table id="competitors-list">
@@ -331,6 +350,7 @@ function load() {
     if (raw) {
       const s = JSON.parse(raw);
       if (!Array.isArray(s.competitors)) s.competitors = [];
+      if (!Array.isArray(s.hidden)) s.hidden = [];
       return s;
     }
     // Migrate v3 (single-pharmacy) into v4 (own + competitors).
@@ -343,10 +363,11 @@ function load() {
         importedAt: v3.importedAt || null,
         reviews: v3.reviews || [],
         competitors: [],
+        hidden: [],
       };
     }
   } catch (e) {}
-  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [] };
+  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [], hidden: [] };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 const state = load();
@@ -793,19 +814,47 @@ function renderCompare() {
   empty.style.display = 'none';
 
   const pharmacies = comparedPharmacies();
-  const allStats = pharmacies.map(p => ({ p, s: stats(p.reviews) }));
 
-  // --- Table ---
+  // Stable color per pharmacy by index in the full list (so toggling
+  // visibility doesn't shuffle colors around).
+  pharmacies.forEach((p, i) => { p.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]; });
+
+  const hidden = new Set(state.hidden || []);
+  const visible = pharmacies.filter(p => !hidden.has(p.placeId));
+
+  // --- Toggle chips ---
+  const togglesEl = $('#compare-toggles');
+  togglesEl.innerHTML = '';
+  pharmacies.forEach(p => {
+    const isHidden = hidden.has(p.placeId);
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (isHidden ? ' off' : '');
+    chip.innerHTML = `<span class="chip-dot" style="background:${p.color}"></span>${escapeHtml(p.name)}${p.isMine ? ' ★' : ''}`;
+    chip.onclick = () => {
+      const next = new Set(state.hidden || []);
+      if (next.has(p.placeId)) next.delete(p.placeId);
+      else next.add(p.placeId);
+      state.hidden = Array.from(next);
+      save();
+      renderCompare();
+    };
+    togglesEl.appendChild(chip);
+  });
+
+  // --- Table (always shows all pharmacies, hidden ones dimmed) ---
+  const allStats = pharmacies.map(p => ({ p, s: stats(p.reviews) }));
   const tbody = $('#compare-table tbody');
   tbody.innerHTML = '';
   for (let i = 0; i < allStats.length; i++) {
     const { p, s } = allStats[i];
-    const color = COMPARE_PALETTE[i % COMPARE_PALETTE.length];
+    const color = p.color;
+    const dim = hidden.has(p.placeId) ? ' style="opacity:0.4"' : '';
     const postRate = s.afterStats ? s.afterStats.perMonth.toFixed(1) + '/mo' : '—';
     const sincePivot = s.afterStats ? fmt(s.afterStats.n) : '—';
     const pos = s.total ? (100 * s.dist[4] / s.total).toFixed(0) + '%' : '—';
     const crit = s.total ? (100 * s.critTotal / s.total).toFixed(0) + '%' : '—';
     const tr = document.createElement('tr');
+    tr.setAttribute('style', dim ? 'opacity:0.4' : '');
     tr.innerHTML =
       `<td><span class="swatch" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${color}; margin-right:6px"></span>` +
       `${p.isMine ? '<b>' : ''}${escapeHtml(p.name)}${p.isMine ? '</b> <span class="muted small">(you)</span>' : ''}</td>` +
@@ -820,9 +869,10 @@ function renderCompare() {
     tbody.appendChild(tr);
   }
 
-  renderCompareCumulative(pharmacies);
-  renderCompareVelocity(pharmacies);
-  renderCompareRating(pharmacies);
+  renderCompareCumulative(visible);
+  renderCompareVelocity(visible);
+  renderCompareRating(visible);
+  renderMilestones(visible);
 
   // --- Competitor list with remove buttons ---
   const lst = $('#competitors-list tbody');
@@ -865,7 +915,7 @@ function renderCompareCumulative(pharmacies) {
   const svg = $('#chart-compare-cum');
   const legend = $('#legend-compare-cum');
   svg.innerHTML = ''; legend.innerHTML = '';
-  const W = 800, H = 280, padL = 48, padR = 16, padT = 14, padB = 32;
+  const W = 800, H = 280, padL = 48, padR = 56, padT = 14, padB = 32;
   const f = { W, H, padL, padR, padT, padB };
 
   // Common X range: oldest review across all, latest = now.
@@ -890,7 +940,7 @@ function renderCompareCumulative(pharmacies) {
 
   series.forEach(({ p, spread }, idx) => {
     if (!spread.length) return;
-    const color = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+    const color = p.color || COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
     const pts = spread.map((x, i) => ({ x: xOf(x._t), y: yOf(i + 1) }));
     pts.push({ x: xOf(maxT), y: yOf(spread.length) });
     const line = document.createElementNS(ns, 'path');
@@ -922,7 +972,7 @@ function renderCompareVelocity(pharmacies) {
   const svg = $('#chart-compare-vel');
   const legend = $('#legend-compare-vel');
   svg.innerHTML = ''; legend.innerHTML = '';
-  const W = 800, H = 280, padL = 48, padR = 16, padT = 14, padB = 32;
+  const W = 800, H = 280, padL = 48, padR = 56, padT = 14, padB = 32;
   const f = { W, H, padL, padR, padT, padB };
 
   let minT = Infinity, maxT = Date.now(), maxRate = 1;
@@ -955,7 +1005,7 @@ function renderCompareVelocity(pharmacies) {
 
   series.forEach(({ p, samples }, idx) => {
     if (!samples.length) return;
-    const color = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+    const color = p.color || COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
     const pts = samples.map(s => ({ x: xOf(s.t), y: yOf(s.rate) }));
     const line = document.createElementNS(ns, 'path');
     line.setAttribute('d', smoothPath(pts));
@@ -972,11 +1022,192 @@ function renderCompareVelocity(pharmacies) {
   });
 }
 
+/* Sample helper: how many reviews has a pharmacy accrued by time t?
+ * Reviews are pre-sorted ascending by date. Binary search the boundary. */
+function countAt(reviews, tMs) {
+  let lo = 0, hi = reviews.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (new Date(reviews[mid].date).getTime() <= tMs) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/* 12-month trailing average rating for a pharmacy at time t. Returns null
+ * when the trailing window has too few reviews to be meaningful. */
+function trailingAvgAt(reviews, tMs, windowDays = 365, minN = 5) {
+  const start = tMs - windowDays * DAY;
+  let sum = 0, n = 0;
+  for (const x of reviews) {
+    const t = new Date(x.date).getTime();
+    if (t > tMs) break;
+    if (t >= start) { sum += x.stars; n++; }
+  }
+  return n >= minN ? sum / n : null;
+}
+
+function buildMilestones(pharmacies) {
+  const events = [];
+  const REVIEW_TIERS = [10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000];
+  const RATING_TIERS = [3.5, 4.0, 4.3, 4.5, 4.7, 4.8, 4.9];
+
+  // Round-number review milestones per pharmacy.
+  for (const p of pharmacies) {
+    for (const n of REVIEW_TIERS) {
+      if (p.reviews.length >= n) {
+        const r = p.reviews[n - 1];
+        events.push({
+          t: new Date(r.date).getTime(),
+          kind: 'milestone',
+          color: p.color,
+          html: `<b>${escapeHtml(p.name)}</b> hit <b>${n}</b> reviews`,
+        });
+      }
+    }
+  }
+
+  // Rating-threshold crossings per pharmacy (monthly sampled trailing avg
+  // first ≥ each tier). Direction = up (passed) and down (fell below).
+  for (const p of pharmacies) {
+    if (p.reviews.length < 5) continue;
+    const start = new Date(p.reviews[0].date);
+    start.setDate(1); start.setHours(0, 0, 0, 0);
+    const endT = Date.now();
+    let prev = null;
+    const reachedUp = new Set(), reachedDown = new Set();
+    for (let m = new Date(start); m.getTime() <= endT; m.setMonth(m.getMonth() + 1)) {
+      const tMs = m.getTime();
+      const cur = trailingAvgAt(p.reviews, tMs);
+      if (prev != null && cur != null) {
+        for (const tier of RATING_TIERS) {
+          if (prev < tier && cur >= tier && !reachedUp.has(tier)) {
+            reachedUp.add(tier);
+            events.push({
+              t: tMs, kind: 'rating-up', color: p.color,
+              html: `<b>${escapeHtml(p.name)}</b> crossed <b>${tier.toFixed(1)}★</b> trailing 12-mo`,
+            });
+          }
+          if (prev >= tier && cur < tier && reachedUp.has(tier) && !reachedDown.has(tier)) {
+            reachedDown.add(tier);
+            events.push({
+              t: tMs, kind: 'rating-down', color: p.color,
+              html: `<b>${escapeHtml(p.name)}</b> slipped below <b>${tier.toFixed(1)}★</b> trailing 12-mo`,
+            });
+          }
+        }
+      }
+      prev = cur;
+    }
+  }
+
+  // Pairwise crossovers: count + rating. Sample on the merged timeline of
+  // all review dates so transitions land exactly where they happen.
+  const timeline = [];
+  for (const p of pharmacies) {
+    for (const r of p.reviews) timeline.push(new Date(r.date).getTime());
+  }
+  timeline.sort((a, b) => a - b);
+  // De-dup adjacent identical timestamps.
+  const ts = timeline.filter((t, i) => i === 0 || t !== timeline[i - 1]);
+
+  for (let i = 0; i < pharmacies.length; i++) {
+    for (let j = i + 1; j < pharmacies.length; j++) {
+      const a = pharmacies[i], b = pharmacies[j];
+
+      // Count crossover.
+      let prevSign = 0;
+      for (const t of ts) {
+        const ca = countAt(a.reviews, t), cb = countAt(b.reviews, t);
+        if (ca === 0 && cb === 0) continue;
+        const sign = ca === cb ? 0 : (ca > cb ? 1 : -1);
+        if (prevSign !== 0 && sign !== 0 && sign !== prevSign) {
+          const winner = sign > 0 ? a : b;
+          const loser = sign > 0 ? b : a;
+          const wC = sign > 0 ? ca : cb;
+          const lC = sign > 0 ? cb : ca;
+          events.push({
+            t, kind: 'count-cross', color: winner.color,
+            html: `<b>${escapeHtml(winner.name)}</b> overtook <b>${escapeHtml(loser.name)}</b> in review count (${wC} vs ${lC})`,
+          });
+        }
+        if (sign !== 0) prevSign = sign;
+      }
+
+      // Rating crossover (monthly sampled).
+      const minStart = Math.min(
+        new Date(a.reviews[0].date).getTime(),
+        new Date(b.reviews[0].date).getTime()
+      );
+      const start = new Date(minStart);
+      start.setDate(1); start.setHours(0, 0, 0, 0);
+      const endT = Date.now();
+      let prevR = 0;
+      for (let m = new Date(start); m.getTime() <= endT; m.setMonth(m.getMonth() + 1)) {
+        const tMs = m.getTime();
+        const ra = trailingAvgAt(a.reviews, tMs);
+        const rb = trailingAvgAt(b.reviews, tMs);
+        if (ra == null || rb == null) continue;
+        const sign = Math.abs(ra - rb) < 0.005 ? 0 : (ra > rb ? 1 : -1);
+        if (prevR !== 0 && sign !== 0 && sign !== prevR) {
+          const winner = sign > 0 ? a : b;
+          const loser = sign > 0 ? b : a;
+          const wR = sign > 0 ? ra : rb;
+          const lR = sign > 0 ? rb : ra;
+          events.push({
+            t: tMs, kind: 'rating-cross', color: winner.color,
+            html: `<b>${escapeHtml(winner.name)}</b> overtook <b>${escapeHtml(loser.name)}</b> in 12-mo avg rating (${wR.toFixed(2)}★ vs ${lR.toFixed(2)}★)`,
+          });
+        }
+        if (sign !== 0) prevR = sign;
+      }
+    }
+  }
+
+  events.sort((a, b) => a.t - b.t);
+  return events;
+}
+
+const KIND_LABELS = {
+  'milestone':    'milestone',
+  'count-cross':  'count crossover',
+  'rating-cross': 'rating crossover',
+  'rating-up':    'rating up',
+  'rating-down':  'rating down',
+};
+
+function renderMilestones(pharmacies) {
+  const wrap = $('#milestones-list');
+  wrap.innerHTML = '';
+  if (pharmacies.length < 2) {
+    wrap.innerHTML = '<div class="muted small">Add more pharmacies to see crossovers between them.</div>';
+    return;
+  }
+  const events = buildMilestones(pharmacies);
+  if (!events.length) {
+    wrap.innerHTML = '<div class="muted small">No milestones detected yet.</div>';
+    return;
+  }
+  // Newest first reads more naturally for a "what just happened" view.
+  events.reverse();
+  for (const e of events) {
+    const d = new Date(e.t);
+    const dateStr = d.toLocaleString('en', { month: 'short', year: 'numeric' });
+    const row = document.createElement('div');
+    row.className = 'milestone';
+    row.innerHTML =
+      `<div class="milestone-date">${dateStr}</div>` +
+      `<div class="milestone-dot" style="background:${e.color || '#888'}"></div>` +
+      `<div class="milestone-text">${e.html}<span class="tag">${KIND_LABELS[e.kind] || e.kind}</span></div>`;
+    wrap.appendChild(row);
+  }
+}
+
 function renderCompareRating(pharmacies) {
   const svg = $('#chart-compare-rating');
   const legend = $('#legend-compare-rating');
   svg.innerHTML = ''; legend.innerHTML = '';
-  const W = 800, H = 280, padL = 48, padR = 16, padT = 14, padB = 32;
+  const W = 800, H = 280, padL = 48, padR = 56, padT = 14, padB = 32;
   const f = { W, H, padL, padR, padT, padB };
 
   let minT = Infinity, maxT = Date.now();
@@ -1023,7 +1254,7 @@ function renderCompareRating(pharmacies) {
 
   series.forEach(({ p, points }, idx) => {
     if (!points.length) return;
-    const color = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+    const color = p.color || COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
     const pts = points.map(pt => ({ x: xOf(pt.t), y: yOf(pt.avg) }));
     const line = document.createElementNS(ns, 'path');
     line.setAttribute('d', smoothPath(pts));
