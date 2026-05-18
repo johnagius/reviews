@@ -148,6 +148,12 @@
     </div>
 
     <section>
+      <h2>Mid-2024 pivot <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(growth before vs after July 1, 2024)</span></h2>
+      <div class="grid two" id="pivot-cards"></div>
+      <div class="muted small" id="pivot-headline" style="margin-top:10px"></div>
+    </section>
+
+    <section>
       <h2>Star distribution</h2>
       <div id="distribution"></div>
     </section>
@@ -215,7 +221,26 @@
     </section>
 
     <section>
-      <h2>Target calculator</h2>
+      <h2>How long to reach N more reviews</h2>
+      <div class="row" style="margin-bottom:8px">
+        <label>Additional reviews wanted
+          <input id="p-count" type="number" min="1" step="1" value="100" style="width:100px">
+        </label>
+        <label>Rate to assume
+          <select id="p-rate-src">
+            <option value="last30">Last 30 days</option>
+            <option value="last90" selected>Last 90 days</option>
+            <option value="last365">Last 365 days</option>
+            <option value="afterPivot">Post-pivot (mid-2024 → now)</option>
+          </select>
+        </label>
+        <button id="p-calc">Project</button>
+      </div>
+      <div id="p-result" class="muted">Pick how many more reviews you want and which historical pace to assume.</div>
+    </section>
+
+    <section>
+      <h2>Target rating calculator</h2>
       <div class="row" style="margin-bottom:8px">
         <label>Target rating <input id="t-target" type="number" min="1" max="5" step="0.1" value="4.8" style="width:80px"></label>
         <label>Future review rating (avg)
@@ -392,6 +417,11 @@ function spreadClusteredTimes(reviews) {
 const DAY = 86400000;
 const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Visible inflection in this dataset: review activity reset around mid-2024.
+// Tagged as a constant here so the dashboard can emphasize the before/after.
+const INFLECTION_DATE = new Date('2024-07-01T00:00:00Z').getTime();
+const INFLECTION_LABEL = 'Mid-2024 pivot';
+
 function avgRatingOf(arr) {
   if (!arr.length) return 0;
   return arr.reduce((a, x) => a + x.stars, 0) / arr.length;
@@ -490,6 +520,27 @@ function stats() {
     }
   }
 
+  // Before / after the mid-2024 inflection.
+  const before = r.filter(x => new Date(x.date).getTime() < INFLECTION_DATE);
+  const after  = r.filter(x => new Date(x.date).getTime() >= INFLECTION_DATE);
+  const sideStats = (arr, spanStart, spanEnd) => {
+    const days = Math.max(1, (spanEnd - spanStart) / DAY);
+    const sum = arr.reduce((a, x) => a + x.stars, 0);
+    const dist5 = arr.filter(x => x.stars === 5).length;
+    return {
+      n: arr.length,
+      avg: arr.length ? sum / arr.length : 0,
+      perMonth: (arr.length / days) * 30,
+      pct5: arr.length ? (100 * dist5 / arr.length) : 0,
+    };
+  };
+  const beforeStats = before.length
+    ? sideStats(before, earliest, INFLECTION_DATE)
+    : null;
+  const afterStats = after.length
+    ? sideStats(after, INFLECTION_DATE, Math.max(latest, now))
+    : null;
+
   // Bayesian-smoothed score: pulls low-N scores toward a global mean.
   // Prior of 50 reviews at a 4.0 industry midpoint — gentle, just enough
   // to make tiny samples honest without distorting our 195-review case.
@@ -510,6 +561,7 @@ function stats() {
     longestGapStart, longestGapEnd,
     bayes,
     dowCounts, dowStars,
+    beforeStats, afterStats,
   };
 }
 
@@ -612,6 +664,7 @@ function render() {
   }
   renderDow(s);
 
+  renderPivot(s);
   renderDistribution(s);
   renderCumulative();
   renderVelocity();
@@ -619,6 +672,39 @@ function render() {
   renderRatingOverTime();
   renderTopReviewers();
   renderRecent();
+}
+
+function renderPivot(s) {
+  const wrap = $('#pivot-cards');
+  const head = $('#pivot-headline');
+  wrap.innerHTML = '';
+  const b = s.beforeStats, a = s.afterStats;
+  const card = (title, st, color) => {
+    if (!st) return `<div class="stat"><div class="label">${title}</div><div class="value">—</div><div class="sub">no reviews in this window</div></div>`;
+    const accent = color;
+    return `<div class="stat" style="border:1px solid ${accent}33;">
+      <div class="label" style="color:${accent}">${title}</div>
+      <div class="value" style="font-size:18px">${fmt(st.n)} reviews · ${st.avg.toFixed(2)}★</div>
+      <div class="sub">${st.perMonth.toFixed(1)}/month · ${st.pct5.toFixed(0)}% are 5★</div>
+    </div>`;
+  };
+  wrap.innerHTML =
+    card('Before mid-2024 (2017 – Jun 30 2024)', b, '#8b95a7') +
+    card('After mid-2024 (Jul 1 2024 – now)',    a, '#2ecc71');
+
+  if (a && b) {
+    const ratio = b.perMonth > 0 ? (a.perMonth / b.perMonth) : null;
+    const pctOfTotal = (a.n / (a.n + b.n)) * 100;
+    const ratingDelta = a.avg - b.avg;
+    head.textContent =
+      `${pctOfTotal.toFixed(0)}% of all reviews arrived after July 2024` +
+      (ratio ? ` — review rate jumped ${ratio.toFixed(1)}× (${b.perMonth.toFixed(1)} → ${a.perMonth.toFixed(1)} per month)` : '') +
+      (Math.abs(ratingDelta) >= 0.01 ? `, rating ${ratingDelta > 0 ? '+' : ''}${ratingDelta.toFixed(2)}★` : '') + '.';
+  } else if (a) {
+    head.textContent = 'All reviews on file are post-pivot.';
+  } else {
+    head.textContent = 'No reviews after July 2024 yet.';
+  }
 }
 
 function renderDow(s) {
@@ -681,6 +767,27 @@ function drawYGrid(svg, f, maxV, fmtFn = String) {
   }
 }
 
+function drawInflection(svg, f, minT, maxT, xOf) {
+  if (INFLECTION_DATE < minT || INFLECTION_DATE > maxT) return;
+  const x = xOf(INFLECTION_DATE);
+  const ln = document.createElementNS(ns, 'line');
+  ln.setAttribute('x1', x); ln.setAttribute('x2', x);
+  ln.setAttribute('y1', f.padT); ln.setAttribute('y2', f.H - f.padB);
+  ln.setAttribute('stroke', '#ffd166');
+  ln.setAttribute('stroke-width', '1.3');
+  ln.setAttribute('stroke-dasharray', '4,3');
+  ln.setAttribute('opacity', '0.85');
+  svg.appendChild(ln);
+  const lbl = document.createElementNS(ns, 'text');
+  lbl.setAttribute('x', x + 5);
+  lbl.setAttribute('y', f.padT + 11);
+  lbl.setAttribute('fill', '#ffd166');
+  lbl.setAttribute('font-size', '10');
+  lbl.setAttribute('font-weight', '600');
+  lbl.textContent = INFLECTION_LABEL;
+  svg.appendChild(lbl);
+}
+
 function drawYearTicks(svg, f, minT, maxT, xOf) {
   const minY = new Date(minT).getFullYear();
   const maxY = new Date(maxT).getFullYear();
@@ -738,6 +845,7 @@ function renderCumulative() {
 
   drawYGrid(svg, f, maxC, v => Math.round(v));
   drawYearTicks(svg, f, minT, maxT, xOf);
+  drawInflection(svg, f, minT, maxT, xOf);
 
   const path = spread.map((x, i) => ({ x: xOf(x._t), y: yOf(i + 1) }));
   path.push({ x: xOf(now), y: yOf(maxC) });
@@ -817,6 +925,7 @@ function renderVelocity() {
 
   drawYGrid(svg, f, maxRate, v => v >= 10 ? Math.round(v) : v.toFixed(1));
   drawYearTicks(svg, f, minT, maxT, xOf);
+  drawInflection(svg, f, minT, maxT, xOf);
 
   const path = samples.map(s => ({ x: xOf(s.t), y: yOf(s.rate) }));
   const fill = document.createElementNS(ns, 'path');
@@ -1034,6 +1143,44 @@ function renderRecent() {
   }
 }
 
+/* =========================== Projection calc ========================= */
+
+function projectionCalc() {
+  const s = stats();
+  const count = parseInt($('#p-count').value, 10);
+  const src = $('#p-rate-src').value;
+  if (!Number.isFinite(count) || count <= 0) {
+    $('#p-result').textContent = 'Enter a positive number of additional reviews.';
+    return;
+  }
+  let perDay, label;
+  if (src === 'last30') { perDay = s.last30 / 30; label = `the last 30 days (${fmt(s.last30)} reviews)`; }
+  else if (src === 'last90') { perDay = s.last90 / 90; label = `the last 90 days (${fmt(s.last90)} reviews)`; }
+  else if (src === 'last365') { perDay = s.last365 / 365; label = `the last 365 days (${fmt(s.last365)} reviews)`; }
+  else if (src === 'afterPivot' && s.afterStats) {
+    perDay = s.afterStats.perMonth / 30;
+    label = `the post-pivot pace (${s.afterStats.n} reviews since mid-2024 → ${s.afterStats.perMonth.toFixed(1)}/month)`;
+  } else {
+    $('#p-result').textContent = 'No data in the chosen window. Pick another rate.';
+    return;
+  }
+  if (!Number.isFinite(perDay) || perDay <= 0) {
+    $('#p-result').textContent = `No reviews recorded in ${label} — choose a longer window.`;
+    return;
+  }
+  const days = count / perDay;
+  const eta = new Date(Date.now() + days * DAY);
+  const weeks = days / 7;
+  const months = days / 30.44;
+  let scaleLine;
+  if (days < 28) scaleLine = `~<b>${weeks.toFixed(1)} weeks</b> (${Math.round(days)} days)`;
+  else if (days < 365) scaleLine = `~<b>${months.toFixed(1)} months</b> (${Math.round(days)} days)`;
+  else scaleLine = `~<b>${(months / 12).toFixed(1)} years</b> (${Math.round(days)} days)`;
+  $('#p-result').innerHTML =
+    `At your ${label} pace of <b>${perDay.toFixed(2)}/day</b> (${(perDay * 30).toFixed(1)}/month), ` +
+    `<b>${fmt(count)}</b> more reviews would take ${scaleLine} — reaching <b>${fmt(s.total + count)}</b> total around <b>${eta.toLocaleDateString()}</b>.`;
+}
+
 /* ============================ Target calc ============================ */
 
 function targetCalc() {
@@ -1119,6 +1266,7 @@ $('#btn-import-2').onclick = onImport;
 $('#btn-export').onclick = onExport;
 $('#btn-clear').onclick = onClear;
 $('#t-calc').onclick = targetCalc;
+$('#p-calc').onclick = projectionCalc;
 
 render();
 </script>
