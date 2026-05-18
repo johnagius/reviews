@@ -107,9 +107,10 @@
   <h1>Pharmacy Review Tracker</h1>
   <span class="muted small" id="imported-line">No data imported yet</span>
   <div class="grow"></div>
-  <button id="btn-import" class="primary">Import JSON</button>
+  <button id="btn-import" class="primary">Import mine</button>
+  <button id="btn-import-comp">Import competitor</button>
   <button id="btn-export">Export JSON</button>
-  <button id="btn-clear" class="danger">Clear</button>
+  <button id="btn-clear" class="danger">Clear all</button>
   <input type="file" id="file-input" accept="application/json,.json" style="display:none">
 </header>
 
@@ -119,11 +120,11 @@
     <h2>Get started — import your Google reviews JSON</h2>
     <p class="small" style="margin-top:0">
       Drop in a JSON file from the Google Reviews scraper (the format with <code>review_id</code>, <code>review_date</code>, <code>rating</code>, etc.).
-      Every chart below populates from it instantly. Re-import any time to refresh.
+      Every chart below populates from it instantly. Re-import any time to refresh. Use <b>Import competitor</b> to layer in rivals for side-by-side stats and timelines.
     </p>
     <div class="row" style="margin-top:6px">
       <button class="primary" id="btn-import-2">Choose JSON file…</button>
-      <span class="muted small">Sample file already in this repo: <code>potters_google_reviews.json</code></span>
+      <span class="muted small">Sample files in this repo: <code>potters_google_reviews.json</code>, <code>medina_google_reviews.json</code>, <code>melita_google_reviews.json</code></span>
     </div>
   </section>
 
@@ -151,6 +152,47 @@
       <h2>Mid-2024 pivot <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(growth before vs after July 1, 2024)</span></h2>
       <div class="grid two" id="pivot-cards"></div>
       <div class="muted small" id="pivot-headline" style="margin-top:10px"></div>
+    </section>
+
+    <section id="competitors-section">
+      <h2>Competitor comparison</h2>
+      <div id="competitors-empty" class="muted small" style="margin-bottom:10px">
+        No competitors imported yet. Click <b>Import competitor</b> in the header to add one — comparison stats and timelines appear here.
+      </div>
+      <div id="competitors-wrap" style="display:none">
+        <table id="compare-table">
+          <thead><tr>
+            <th>Pharmacy</th>
+            <th class="num">Reviews</th>
+            <th class="num">Avg</th>
+            <th class="num">Bayesian</th>
+            <th class="num">5★</th>
+            <th class="num">1-2★</th>
+            <th class="num">Last 90d</th>
+            <th class="num">Since pivot</th>
+            <th class="num">Post-pivot rate</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+
+        <h2 style="margin-top:16px">Cumulative reviews — all pharmacies</h2>
+        <svg class="chart" id="chart-compare-cum" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        <div class="legend" id="legend-compare-cum"></div>
+
+        <h2 style="margin-top:16px">Review velocity — all pharmacies <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(rolling 90-day rate, reviews per month)</span></h2>
+        <svg class="chart" id="chart-compare-vel" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        <div class="legend" id="legend-compare-vel"></div>
+
+        <h2 style="margin-top:16px">Average rating over time — all pharmacies <span class="muted small" style="text-transform:none; letter-spacing:0; font-weight:normal">(12-month trailing average)</span></h2>
+        <svg class="chart" id="chart-compare-rating" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        <div class="legend" id="legend-compare-rating"></div>
+
+        <h2 style="margin-top:16px">Loaded competitors</h2>
+        <table id="competitors-list">
+          <thead><tr><th>Name</th><th>Place ID</th><th class="num">Reviews</th><th>Imported</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
 
     <section>
@@ -277,7 +319,7 @@
    }
    ------------------------------------------------------------------------- */
 
-const STORE_KEY = 'pharmRev.v3';
+const STORE_KEY = 'pharmRev.v4';
 
 const $  = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
@@ -286,9 +328,25 @@ const ns = 'http://www.w3.org/2000/svg';
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (!Array.isArray(s.competitors)) s.competitors = [];
+      return s;
+    }
+    // Migrate v3 (single-pharmacy) into v4 (own + competitors).
+    const v3raw = localStorage.getItem('pharmRev.v3');
+    if (v3raw) {
+      const v3 = JSON.parse(v3raw);
+      return {
+        pharmacyName: v3.pharmacyName || '',
+        placeId: v3.placeId || '',
+        importedAt: v3.importedAt || null,
+        reviews: v3.reviews || [],
+        competitors: [],
+      };
+    }
   } catch (e) {}
-  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [] };
+  return { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [] };
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 const state = load();
@@ -324,7 +382,7 @@ function pickReviewText(rt) {
   return { text: '', lang: '' };
 }
 
-function importScraperJson(json, fileName) {
+function parseScraperJson(json) {
   // Top-level: either { "<placeId>": [reviews...] } or directly an array.
   let bucket = json;
   let placeId = '';
@@ -337,7 +395,6 @@ function importScraperJson(json, fileName) {
   if (!Array.isArray(bucket)) {
     throw new Error('JSON must contain an array of reviews (or a single-key object whose value is one).');
   }
-
   const reviews = bucket
     .filter(r => r && !r.is_deleted)
     .map(r => {
@@ -349,8 +406,7 @@ function importScraperJson(json, fileName) {
         ago: r.raw_date || '',
         stars: Math.max(1, Math.min(5, stars || 1)),
         author: r.author || 'Anonymous',
-        text,
-        lang,
+        text, lang,
         likes: Number(r.likes) || 0,
         hasResponse: !!(r.owner_responses && typeof r.owner_responses === 'object'
                         && Object.keys(r.owner_responses).length > 0),
@@ -359,16 +415,48 @@ function importScraperJson(json, fileName) {
     })
     .filter(r => r.date)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
-
   if (!reviews.length) throw new Error('No valid reviews found in JSON.');
+  return { placeId, reviews };
+}
 
-  state.placeId = placeId;
-  state.pharmacyName = inferName(reviews, fileName);
-  state.importedAt = new Date().toISOString();
-  state.reviews = reviews;
+function importScraperJson(json, fileName, target = 'mine') {
+  const { placeId, reviews } = parseScraperJson(json);
+  const name = inferName(reviews, fileName);
+
+  if (target === 'mine') {
+    state.placeId = placeId;
+    state.pharmacyName = name;
+    state.importedAt = new Date().toISOString();
+    state.reviews = reviews;
+    toast(`Imported ${reviews.length} reviews as your pharmacy`, 'good');
+  } else {
+    if (!Array.isArray(state.competitors)) state.competitors = [];
+    // Refuse to add as a competitor if it duplicates the user's own.
+    if (placeId && state.placeId && placeId === state.placeId) {
+      toast(`That JSON matches your own pharmacy's place ID — use "Import mine" instead.`, 'err');
+      return;
+    }
+    const idx = state.competitors.findIndex(c => placeId && c.placeId === placeId);
+    const comp = { name, placeId, importedAt: new Date().toISOString(), reviews };
+    if (idx >= 0) {
+      state.competitors[idx] = comp;
+      toast(`Updated competitor ${name} (${reviews.length} reviews)`, 'good');
+    } else {
+      state.competitors.push(comp);
+      toast(`Added competitor ${name} (${reviews.length} reviews)`, 'good');
+    }
+  }
   save();
   render();
-  toast(`Imported ${reviews.length} reviews`, 'good');
+}
+
+function removeCompetitor(placeId) {
+  const before = state.competitors.length;
+  state.competitors = state.competitors.filter(c => c.placeId !== placeId);
+  if (state.competitors.length !== before) {
+    save();
+    render();
+  }
 }
 
 function inferName(reviews, fileName) {
@@ -427,8 +515,8 @@ function avgRatingOf(arr) {
   return arr.reduce((a, x) => a + x.stars, 0) / arr.length;
 }
 
-function stats() {
-  const r = state.reviews || [];
+function stats(reviewsArg) {
+  const r = reviewsArg || state.reviews || [];
   const total = r.length;
   const dist = [0, 0, 0, 0, 0];
   let likes = 0, withText = 0, withResp = 0, textCharSum = 0;
@@ -665,6 +753,7 @@ function render() {
   renderDow(s);
 
   renderPivot(s);
+  renderCompare();
   renderDistribution(s);
   renderCumulative();
   renderVelocity();
@@ -672,6 +761,292 @@ function render() {
   renderRatingOverTime();
   renderTopReviewers();
   renderRecent();
+}
+
+/* ====================== Competitor comparison ======================== */
+
+const COMPARE_PALETTE = ['#ffd166', '#4f8cff', '#2ecc71', '#a55cff', '#26d4cf', '#ff8fbf', '#9fb33f'];
+
+function comparedPharmacies() {
+  // First slot is "mine" (gold). Then each competitor in import order.
+  const arr = [];
+  if (state.reviews && state.reviews.length) {
+    arr.push({ name: state.pharmacyName || 'My pharmacy', placeId: state.placeId,
+               importedAt: state.importedAt, reviews: state.reviews, isMine: true });
+  }
+  for (const c of (state.competitors || [])) {
+    arr.push({ ...c, isMine: false });
+  }
+  return arr;
+}
+
+function renderCompare() {
+  const wrap = $('#competitors-wrap');
+  const empty = $('#competitors-empty');
+  const comps = state.competitors || [];
+  if (!comps.length) {
+    wrap.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  wrap.style.display = '';
+  empty.style.display = 'none';
+
+  const pharmacies = comparedPharmacies();
+  const allStats = pharmacies.map(p => ({ p, s: stats(p.reviews) }));
+
+  // --- Table ---
+  const tbody = $('#compare-table tbody');
+  tbody.innerHTML = '';
+  for (let i = 0; i < allStats.length; i++) {
+    const { p, s } = allStats[i];
+    const color = COMPARE_PALETTE[i % COMPARE_PALETTE.length];
+    const postRate = s.afterStats ? s.afterStats.perMonth.toFixed(1) + '/mo' : '—';
+    const sincePivot = s.afterStats ? fmt(s.afterStats.n) : '—';
+    const pos = s.total ? (100 * s.dist[4] / s.total).toFixed(0) + '%' : '—';
+    const crit = s.total ? (100 * s.critTotal / s.total).toFixed(0) + '%' : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td><span class="swatch" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${color}; margin-right:6px"></span>` +
+      `${p.isMine ? '<b>' : ''}${escapeHtml(p.name)}${p.isMine ? '</b> <span class="muted small">(you)</span>' : ''}</td>` +
+      `<td class="num">${fmt(s.total)}</td>` +
+      `<td class="num">${s.avg.toFixed(2)}★</td>` +
+      `<td class="num">${s.bayes.toFixed(2)}★</td>` +
+      `<td class="num">${pos}</td>` +
+      `<td class="num">${crit}</td>` +
+      `<td class="num">${fmt(s.last90)}</td>` +
+      `<td class="num">${sincePivot}</td>` +
+      `<td class="num">${postRate}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  renderCompareCumulative(pharmacies);
+  renderCompareVelocity(pharmacies);
+  renderCompareRating(pharmacies);
+
+  // --- Competitor list with remove buttons ---
+  const lst = $('#competitors-list tbody');
+  lst.innerHTML = '';
+  for (const c of comps) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${escapeHtml(c.name)}</td>` +
+      `<td class="muted small">${escapeHtml(c.placeId || '')}</td>` +
+      `<td class="num">${fmt(c.reviews.length)}</td>` +
+      `<td class="muted small">${c.importedAt ? new Date(c.importedAt).toLocaleDateString() : '—'}</td>` +
+      `<td><button data-id="${escapeHtml(c.placeId || c.name)}" class="danger small btn-remove-comp">Remove</button></td>`;
+    lst.appendChild(tr);
+  }
+  $$('.btn-remove-comp').forEach(btn => {
+    btn.onclick = () => {
+      if (confirm(`Remove competitor "${btn.dataset.id}"?`)) removeCompetitor(btn.dataset.id);
+    };
+  });
+}
+
+function drawMultiYGrid(svg, f, maxV, fmtFn = String) {
+  for (let i = 0; i <= 4; i++) {
+    const y = f.padT + (i / 4) * (f.H - f.padT - f.padB);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', f.padL); ln.setAttribute('x2', f.W - f.padR);
+    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+    ln.setAttribute('stroke', '#232b3a');
+    svg.appendChild(ln);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', f.padL - 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
+    lbl.setAttribute('text-anchor', 'end');
+    lbl.textContent = fmtFn(maxV - (i / 4) * maxV);
+    svg.appendChild(lbl);
+  }
+}
+
+function renderCompareCumulative(pharmacies) {
+  const svg = $('#chart-compare-cum');
+  const legend = $('#legend-compare-cum');
+  svg.innerHTML = ''; legend.innerHTML = '';
+  const W = 800, H = 280, padL = 48, padR = 16, padT = 14, padB = 32;
+  const f = { W, H, padL, padR, padT, padB };
+
+  // Common X range: oldest review across all, latest = now.
+  let minT = Infinity, maxT = Date.now(), maxC = 0;
+  const series = pharmacies.map(p => {
+    const spread = spreadClusteredTimes(p.reviews);
+    if (spread.length) {
+      minT = Math.min(minT, spread[0]._t);
+      maxT = Math.max(maxT, spread[spread.length - 1]._t);
+      maxC = Math.max(maxC, spread.length);
+    }
+    return { p, spread };
+  });
+  if (!isFinite(minT)) return;
+
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yOf = c => f.padT + (1 - c / maxC) * (f.H - f.padT - f.padB);
+
+  drawMultiYGrid(svg, f, maxC, v => Math.round(v));
+  drawYearTicks(svg, f, minT, maxT, xOf);
+  drawInflection(svg, f, minT, maxT, xOf);
+
+  series.forEach(({ p, spread }, idx) => {
+    if (!spread.length) return;
+    const color = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+    const pts = spread.map((x, i) => ({ x: xOf(x._t), y: yOf(i + 1) }));
+    pts.push({ x: xOf(maxT), y: yOf(spread.length) });
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('d', smoothPath(pts));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', p.isMine ? '2.4' : '1.8');
+    line.setAttribute('stroke-linejoin', 'round');
+    line.setAttribute('opacity', '0.95');
+    svg.appendChild(line);
+    // Final-count label at the right end.
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', xOf(maxT) + 4);
+    lbl.setAttribute('y', yOf(spread.length) + 3);
+    lbl.setAttribute('fill', color);
+    lbl.setAttribute('font-size', '11');
+    lbl.setAttribute('font-weight', '600');
+    lbl.textContent = spread.length;
+    svg.appendChild(lbl);
+
+    const k = document.createElement('div');
+    k.className = 'key';
+    k.innerHTML = `<span class="swatch" style="background:${color}"></span>${escapeHtml(p.name)}${p.isMine ? ' ★' : ''}`;
+    legend.appendChild(k);
+  });
+}
+
+function renderCompareVelocity(pharmacies) {
+  const svg = $('#chart-compare-vel');
+  const legend = $('#legend-compare-vel');
+  svg.innerHTML = ''; legend.innerHTML = '';
+  const W = 800, H = 280, padL = 48, padR = 16, padT = 14, padB = 32;
+  const f = { W, H, padL, padR, padT, padB };
+
+  let minT = Infinity, maxT = Date.now(), maxRate = 1;
+  const series = pharmacies.map((p, idx) => {
+    if (!p.reviews.length) return { p, samples: [] };
+    const minPT = new Date(p.reviews[0].date).getTime();
+    minT = Math.min(minT, minPT);
+    const start = new Date(minPT); start.setDate(1); start.setHours(0, 0, 0, 0);
+    const samples = [];
+    for (let m = new Date(start); m.getTime() <= maxT; m.setMonth(m.getMonth() + 1)) {
+      const end = m.getTime();
+      const wStart = end - 90 * DAY;
+      const count = p.reviews.reduce((acc, x) => {
+        const t = new Date(x.date).getTime();
+        return acc + (t > wStart && t <= end ? 1 : 0);
+      }, 0);
+      samples.push({ t: end, rate: count / 3 });
+    }
+    for (const s of samples) maxRate = Math.max(maxRate, s.rate);
+    return { p, samples };
+  });
+  if (!isFinite(minT)) return;
+
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yOf = v => f.padT + (1 - v / maxRate) * (f.H - f.padT - f.padB);
+
+  drawMultiYGrid(svg, f, maxRate, v => v >= 10 ? Math.round(v) : v.toFixed(1));
+  drawYearTicks(svg, f, minT, maxT, xOf);
+  drawInflection(svg, f, minT, maxT, xOf);
+
+  series.forEach(({ p, samples }, idx) => {
+    if (!samples.length) return;
+    const color = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+    const pts = samples.map(s => ({ x: xOf(s.t), y: yOf(s.rate) }));
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('d', smoothPath(pts));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', p.isMine ? '2.4' : '1.8');
+    line.setAttribute('stroke-linejoin', 'round');
+    line.setAttribute('opacity', '0.95');
+    svg.appendChild(line);
+    const k = document.createElement('div');
+    k.className = 'key';
+    k.innerHTML = `<span class="swatch" style="background:${color}"></span>${escapeHtml(p.name)}${p.isMine ? ' ★' : ''}`;
+    legend.appendChild(k);
+  });
+}
+
+function renderCompareRating(pharmacies) {
+  const svg = $('#chart-compare-rating');
+  const legend = $('#legend-compare-rating');
+  svg.innerHTML = ''; legend.innerHTML = '';
+  const W = 800, H = 280, padL = 48, padR = 16, padT = 14, padB = 32;
+  const f = { W, H, padL, padR, padT, padB };
+
+  let minT = Infinity, maxT = Date.now();
+  const series = pharmacies.map(p => {
+    if (!p.reviews.length) return { p, points: [] };
+    minT = Math.min(minT, new Date(p.reviews[0].date).getTime());
+    const start = new Date(p.reviews[0].date); start.setDate(1); start.setHours(0, 0, 0, 0);
+    const points = [];
+    for (let m = new Date(start); m.getTime() <= maxT; m.setMonth(m.getMonth() + 1)) {
+      const end = m.getTime();
+      const wStart = end - 365 * DAY;
+      let sum = 0, n = 0;
+      for (const x of p.reviews) {
+        const t = new Date(x.date).getTime();
+        if (t > end) break;
+        if (t >= wStart) { sum += x.stars; n++; }
+      }
+      if (n > 0) points.push({ t: end, avg: sum / n });
+    }
+    return { p, points };
+  });
+  if (!isFinite(minT)) return;
+
+  const yMin = 1, yMax = 5;
+  const xOf = t => f.padL + ((t - minT) / Math.max(1, maxT - minT)) * (f.W - f.padL - f.padR);
+  const yOf = v => f.padT + ((yMax - v) / (yMax - yMin)) * (f.H - f.padT - f.padB);
+
+  for (let s = 1; s <= 5; s++) {
+    const y = yOf(s);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', f.padL); ln.setAttribute('x2', f.W - f.padR);
+    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+    ln.setAttribute('stroke', '#232b3a');
+    svg.appendChild(ln);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', f.padL - 6); lbl.setAttribute('y', y + 3);
+    lbl.setAttribute('fill', '#8b95a7'); lbl.setAttribute('font-size', '10');
+    lbl.setAttribute('text-anchor', 'end');
+    lbl.textContent = s + '★';
+    svg.appendChild(lbl);
+  }
+  drawYearTicks(svg, f, minT, maxT, xOf);
+  drawInflection(svg, f, minT, maxT, xOf);
+
+  series.forEach(({ p, points }, idx) => {
+    if (!points.length) return;
+    const color = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+    const pts = points.map(pt => ({ x: xOf(pt.t), y: yOf(pt.avg) }));
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('d', smoothPath(pts));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', p.isMine ? '2.4' : '1.8');
+    line.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(line);
+    const last = points[points.length - 1];
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', xOf(last.t) + 4);
+    lbl.setAttribute('y', yOf(last.avg) + 3);
+    lbl.setAttribute('fill', color);
+    lbl.setAttribute('font-size', '11');
+    lbl.setAttribute('font-weight', '600');
+    lbl.textContent = last.avg.toFixed(2);
+    svg.appendChild(lbl);
+
+    const k = document.createElement('div');
+    k.className = 'key';
+    k.innerHTML = `<span class="swatch" style="background:${color}"></span>${escapeHtml(p.name)}${p.isMine ? ' ★' : ''}`;
+    legend.appendChild(k);
+  });
 }
 
 function renderPivot(s) {
@@ -1228,13 +1603,13 @@ async function pickFile() {
   });
 }
 
-async function onImport() {
+async function onImport(target = 'mine') {
   const file = await pickFile();
   if (!file) return;
   try {
     const text = await readFile(file);
     const json = JSON.parse(text);
-    importScraperJson(json, file.name);
+    importScraperJson(json, file.name, target);
   } catch (e) {
     console.error(e);
     toast('Import failed: ' + (e.message || e), 'err');
@@ -1254,15 +1629,16 @@ function onExport() {
 }
 
 function onClear() {
-  if (!confirm('Clear all imported review data? Export first if you want a backup.')) return;
+  if (!confirm('Clear all imported data (your pharmacy AND all competitors)? Export first if you want a backup.')) return;
   localStorage.removeItem(STORE_KEY);
-  Object.assign(state, { pharmacyName: '', placeId: '', importedAt: null, reviews: [] });
+  Object.assign(state, { pharmacyName: '', placeId: '', importedAt: null, reviews: [], competitors: [] });
   render();
   toast('Cleared.');
 }
 
-$('#btn-import').onclick = onImport;
-$('#btn-import-2').onclick = onImport;
+$('#btn-import').onclick = () => onImport('mine');
+$('#btn-import-2').onclick = () => onImport('mine');
+$('#btn-import-comp').onclick = () => onImport('competitor');
 $('#btn-export').onclick = onExport;
 $('#btn-clear').onclick = onClear;
 $('#t-calc').onclick = targetCalc;
