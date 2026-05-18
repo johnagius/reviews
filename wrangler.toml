@@ -8,7 +8,7 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "pharm-reviews"
-database_id = "PASTE-DATABASE-ID-FROM-WRANGLER-D1-CREATE"
+database_id = "19190cd6-dc50-454a-bd06-945d47b4590f"
 
 # PHARM_TOKEN is a secret, not a [vars] entry. Set it once with:
 #   npx wrangler secret put PHARM_TOKEN
