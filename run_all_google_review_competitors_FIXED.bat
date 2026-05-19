@@ -146,8 +146,14 @@ echo ============================================================
 echo Starting all pharmacy scrapes
 echo ============================================================
 echo.
-echo Chrome SHOULD open for each pharmacy because headless is set to false.
-echo Do not click inside the CMD window while it runs.
+echo NOTE: On this system Chrome may run in the background and not appear
+echo as a visible window, even though headless mode is disabled in the
+echo config. To give you a clear "it is running" signal, a separate
+echo "Live progress" window will open for each pharmacy with a live tail
+echo of the scraper log. That window closes automatically when the
+echo pharmacy finishes and the next one opens.
+echo.
+echo Do not click inside this CMD window while it runs.
 echo If Google opens the wrong listing for a pharmacy, press Ctrl+C.
 echo.
 
@@ -182,9 +188,11 @@ set "IMAGE_DIR=review_images\!PHARMACY_SLUG!"
 set "JSON_BACKUP_PATH=exports\!PHARMACY_SLUG!\!PHARMACY_SLUG!_backup.json"
 set "JSON_EXPORT_PATH=exports\!PHARMACY_SLUG!\!PHARMACY_SLUG!.json"
 set "LOG_FILE=!PHARMACY_SLUG!_scraper.log"
+set "LIVE_WINDOW_TITLE=Live progress: !PHARMACY_SLUG!"
 
 if not exist "!EXPORT_DIR!" mkdir "!EXPORT_DIR!"
 if not exist "!IMAGE_DIR!" mkdir "!IMAGE_DIR!"
+if not exist "logs" mkdir "logs"
 
 echo.
 echo ============================================================
@@ -206,7 +214,8 @@ echo.
 echo Export folder:
 echo !CD!\!EXPORT_DIR!
 echo.
-echo Chrome should open shortly.
+echo A "Live progress" window will open shortly for this pharmacy so you
+echo can see scraper activity in real time. Chrome itself may run hidden.
 echo.
 
 echo ------------------------------------------------------------ >> "!RUN_SUMMARY_FILE!"
@@ -250,12 +259,19 @@ echo Validating generated config...
 python -c "import yaml; data=yaml.safe_load(open(r'!CONFIG_PATH!', encoding='utf-8')); print('CONFIG HEADLESS =', data.get('headless')); print('CONFIG URL =', data.get('url'))"
 
 echo.
+echo Opening Live progress window for !PHARMACY_LABEL!...
+type nul > "logs\!LOG_FILE!"
+start "!LIVE_WINDOW_TITLE!" cmd /c powershell -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.WindowTitle='!LIVE_WINDOW_TITLE!'; Write-Host 'Live progress for !PHARMACY_LABEL!' -ForegroundColor Cyan; Write-Host '(this window closes automatically when this pharmacy finishes)' -ForegroundColor DarkGray; Write-Host ''; Get-Content -Path 'logs\!LOG_FILE!' -Wait -Tail 200 -ErrorAction SilentlyContinue"
+
+echo.
 echo Running scrape command now...
 echo.
 
 python -u start.py scrape --config "!CONFIG_PATH!" --db-path "!DB_PATH!" --url "!PHARMACY_URL!" --scrape-mode full --sort newest --max-scroll-attempts !MAX_SCROLL_ATTEMPTS! --scroll-idle-limit !SCROLL_IDLE_LIMIT! --download-images false --use-mongodb false --convert-dates true
 
 set "SCRAPE_EXIT_CODE=!ERRORLEVEL!"
+
+taskkill /FI "WINDOWTITLE eq !LIVE_WINDOW_TITLE!*" /F >nul 2>&1
 
 if not "!SCRAPE_EXIT_CODE!"=="0" (
     echo.
