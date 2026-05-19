@@ -149,12 +149,11 @@ echo ============================================================
 echo Starting all pharmacy scrapes
 echo ============================================================
 echo.
-echo NOTE: On this system Chrome may run in the background and not appear
-echo as a visible window, even though headless mode is disabled in the
-echo config. To give you a clear "it is running" signal, a separate
-echo "Live progress" window will open for each pharmacy with a live tail
-echo of the scraper log. That window closes automatically when the
-echo pharmacy finishes and the next one opens.
+echo NOTE: Chrome runs in headless mode (no visible window). To give you a
+echo clear "it is running" signal, a separate "Live progress" window will
+echo open for each pharmacy with a live tail of the scraper log. That
+echo window closes automatically when the pharmacy finishes and the next
+echo one opens.
 echo.
 echo Do not click inside this CMD window while it runs.
 echo If Google opens the wrong listing for a pharmacy, press Ctrl+C.
@@ -218,7 +217,7 @@ echo Export folder:
 echo !CD!\!EXPORT_DIR!
 echo.
 echo A "Live progress" window will open shortly for this pharmacy so you
-echo can see scraper activity in real time. Chrome itself may run hidden.
+echo can see scraper activity in real time. Chrome runs headless.
 echo.
 
 echo ------------------------------------------------------------ >> "!RUN_SUMMARY_FILE!"
@@ -228,34 +227,34 @@ echo URL: !PHARMACY_URL! >> "!RUN_SUMMARY_FILE!"
 echo Started: %DATE% %TIME% >> "!RUN_SUMMARY_FILE!"
 
 (
-echo headless: false
-echo sort_by: "newest"
-echo scrape_mode: "full"
+echo headless: true
+echo sort_by: 'newest'
+echo scrape_mode: 'full'
 echo stop_threshold: 0
 echo max_reviews: 0
 echo max_scroll_attempts: !MAX_SCROLL_ATTEMPTS!
 echo scroll_idle_limit: !SCROLL_IDLE_LIMIT!
-echo db_path: "!DB_PATH!"
+echo db_path: '!DB_PATH!'
 echo convert_dates: true
 echo download_images: false
-echo image_dir: "!IMAGE_DIR!"
+echo image_dir: '!IMAGE_DIR!'
 echo download_threads: 4
 echo max_width: 1200
 echo max_height: 1200
 echo use_mongodb: false
 echo use_s3: false
 echo backup_to_json: true
-echo json_path: "!JSON_BACKUP_PATH!"
+echo json_path: '!JSON_BACKUP_PATH!'
 echo replace_urls: false
 echo preserve_original_urls: true
 echo store_local_paths: false
-echo log_level: "INFO"
-echo log_dir: "logs"
-echo log_file: "!LOG_FILE!"
+echo log_level: 'INFO'
+echo log_dir: 'logs'
+echo log_file: '!LOG_FILE!'
 echo custom_params:
-echo   company: "!PHARMACY_COMPANY!"
-echo   source: "Google Maps"
-echo url: "!PHARMACY_URL!"
+echo   company: '!PHARMACY_COMPANY!'
+echo   source: 'Google Maps'
+echo url: '!PHARMACY_URL!'
 ) > "!CONFIG_PATH!"
 
 echo Validating generated config...
