@@ -9,12 +9,15 @@ echo All Google Reviews Competitor Scraper FIXED
 echo ============================================================
 echo.
 
-set "BASE_DIR=C:\Users\Potte\Downloads"
+set "BASE_DIR=%USERPROFILE%\Downloads\reviews-main"
 set "MAX_SCROLL_ATTEMPTS=350"
 set "SCROLL_IDLE_LIMIT=35"
 
 if not exist "!BASE_DIR!" (
-    echo Downloads folder was not found:
+    echo Search folder was not found:
+    echo !BASE_DIR!
+    echo.
+    echo Expected the unzipped reviews repo at:
     echo !BASE_DIR!
     pause
     exit /b 1
@@ -28,15 +31,15 @@ echo.
 
 set "REPO_DIR="
 
-for /f "delims=" %%F in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path 'C:\Users\Potte\Downloads' -Filter start.py -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like '*google-reviews-scraper-pro*' } | Select-Object -First 1 -ExpandProperty DirectoryName"') do (
+for /f "delims=" %%F in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '!BASE_DIR!' -Filter start.py -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like '*google-reviews-scraper-pro*' } | Select-Object -First 1 -ExpandProperty DirectoryName"') do (
     set "REPO_DIR=%%F"
 )
 
 if not defined REPO_DIR (
     echo Could not find start.py inside any google-reviews-scraper-pro folder.
     echo.
-    echo Open C:\Users\Potte\Downloads and check if the repo is extracted.
-    echo You need a folder containing start.py.
+    echo Open !BASE_DIR! and check that the scraper is extracted.
+    echo You need a folder containing start.py somewhere under that path.
     echo.
     pause
     exit /b 1
