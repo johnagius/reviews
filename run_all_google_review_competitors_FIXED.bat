@@ -10,8 +10,16 @@ echo ============================================================
 echo.
 
 set "BASE_DIR=%USERPROFILE%\Downloads\reviews-main"
-set "MAX_SCROLL_ATTEMPTS=350"
-set "SCROLL_IDLE_LIMIT=35"
+rem MAX_SCROLL_ATTEMPTS = hard ceiling on "no new review" scroll rounds.
+rem SCROLL_IDLE_LIMIT    = how many empty rounds to tolerate AFTER the last
+rem new review before declaring the end of the list. It resets to 0 every
+rem time a new review appears, so a low value does NOT truncate results --
+rem it just stops the scraper from spending ~4 idle minutes per pharmacy
+rem spamming "No new reviews / Scroll is stuck" once everything is collected.
+rem (Bump SCROLL_IDLE_LIMIT to 12-15 only if you ever suspect a busy listing
+rem got cut short on a slow connection.)
+set "MAX_SCROLL_ATTEMPTS=80"
+set "SCROLL_IDLE_LIMIT=8"
 
 if not exist "!BASE_DIR!" (
     echo Search folder was not found:
