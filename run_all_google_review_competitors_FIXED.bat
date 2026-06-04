@@ -157,11 +157,11 @@ echo ============================================================
 echo Starting all pharmacy scrapes
 echo ============================================================
 echo.
-echo NOTE: Chrome runs in headless mode (no visible window). To give you a
-echo clear "it is running" signal, a separate "Live progress" window will
-echo open for each pharmacy with a live tail of the scraper log. That
-echo window closes automatically when the pharmacy finishes and the next
-echo one opens.
+echo NOTE: Chrome runs in headless mode (no visible window). The scraper's
+echo progress streams directly in THIS window. Near the end of each pharmacy
+echo you will see repeated "No new reviews" / "Scroll is stuck" lines -- that
+echo is the NORMAL end-of-list check, not a freeze. Let it run; it moves on
+echo to the next pharmacy on its own.
 echo.
 echo Do not click inside this CMD window while it runs.
 echo If Google opens the wrong listing for a pharmacy, press Ctrl+C.
@@ -224,8 +224,8 @@ echo.
 echo Export folder:
 echo !CD!\!EXPORT_DIR!
 echo.
-echo A "Live progress" window will open shortly for this pharmacy so you
-echo can see scraper activity in real time. Chrome runs headless.
+echo Scraper progress for this pharmacy streams below in this window.
+echo Chrome runs headless (no separate browser window).
 echo.
 
 echo ------------------------------------------------------------ >> "!RUN_SUMMARY_FILE!"
@@ -269,9 +269,7 @@ echo Validating generated config...
 python -c "import yaml; data=yaml.safe_load(open(r'!CONFIG_PATH!', encoding='utf-8')); print('CONFIG HEADLESS =', data.get('headless')); print('CONFIG URL =', data.get('url'))"
 
 echo.
-echo Opening Live progress window for !PHARMACY_LABEL!...
 type nul > "logs\!LOG_FILE!"
-start "!LIVE_WINDOW_TITLE!" cmd /c powershell -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.WindowTitle='!LIVE_WINDOW_TITLE!'; Write-Host 'Live progress for !PHARMACY_LABEL!' -ForegroundColor Cyan; Write-Host '(this window closes automatically when this pharmacy finishes)' -ForegroundColor DarkGray; Write-Host ''; Get-Content -Path 'logs\!LOG_FILE!' -Wait -Tail 200 -ErrorAction SilentlyContinue"
 
 echo.
 echo Running scrape command now...
@@ -281,7 +279,11 @@ python -u start.py scrape --config "!CONFIG_PATH!" --db-path "!DB_PATH!" --url "
 
 set "SCRAPE_EXIT_CODE=!ERRORLEVEL!"
 
-taskkill /FI "WINDOWTITLE eq !LIVE_WINDOW_TITLE!*" /F >nul 2>&1
+rem Clean up any stray SeleniumBase automation drivers left behind by this
+rem scrape so they cannot accumulate and stall the next pharmacy. These are
+rem the automation drivers ONLY -- this does NOT touch your normal Chrome.
+taskkill /IM uc_driver.exe /F >nul 2>&1
+taskkill /IM chromedriver.exe /F >nul 2>&1
 
 if not "!SCRAPE_EXIT_CODE!"=="0" (
     echo.
@@ -298,15 +300,10 @@ if not "!SCRAPE_EXIT_CODE!"=="0" (
 )
 
 echo.
-echo Database stats for !PHARMACY_LABEL!:
-echo.
-
-python start.py db-stats --config "!CONFIG_PATH!" --db-path "!DB_PATH!"
-
-echo.
 echo Exporting CSV for !PHARMACY_LABEL!:
 echo.
 
+echo POST-SCRAPE: starting CSV export... >> "!RUN_SUMMARY_FILE!"
 python start.py export --config "!CONFIG_PATH!" --db-path "!DB_PATH!" --format csv --output "!EXPORT_DIR!"
 
 set "CSV_EXIT_CODE=!ERRORLEVEL!"
@@ -323,6 +320,7 @@ echo.
 echo Exporting JSON for !PHARMACY_LABEL!:
 echo.
 
+echo POST-SCRAPE: starting JSON export... >> "!RUN_SUMMARY_FILE!"
 python start.py export --config "!CONFIG_PATH!" --db-path "!DB_PATH!" --format json --output "!JSON_EXPORT_PATH!"
 
 set "JSON_EXIT_CODE=!ERRORLEVEL!"
