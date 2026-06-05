@@ -674,6 +674,28 @@ async function importScraperJson(json, fileName, target = 'mine') {
   }
   setBusy(`Uploading ${reviews.length} reviews for ${name}…`);
   try {
+    // Auto-replace by name: the scraper occasionally assigns the same
+    // pharmacy a slightly different place ID across runs, which would
+    // otherwise create a duplicate row instead of overwriting. Before
+    // importing, delete any existing row that's clearly the same pharmacy
+    // (same name) but stored under a different place ID, so this import
+    // replaces it cleanly. Scoped so importing a competitor never touches
+    // your own pharmacy and vice-versa.
+    let replaced = 0;
+    if (placeId) {
+      const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const candidates = (target === 'mine' && state.placeId)
+        ? [{ name: state.pharmacyName, placeId: state.placeId }]
+        : (state.competitors || []);
+      const staleIds = candidates
+        .filter(c => c.placeId && c.placeId !== placeId && norm(c.name) === norm(name))
+        .map(c => c.placeId);
+      for (const staleId of staleIds) {
+        await apiFetch('/pharmacy/' + encodeURIComponent(staleId), { method: 'DELETE' });
+        replaced++;
+      }
+    }
+
     await apiFetch('/import', {
       method: 'POST',
       body: JSON.stringify({
@@ -685,9 +707,10 @@ async function importScraperJson(json, fileName, target = 'mine') {
     });
     await loadFromApi();
     render();
+    const replacedNote = replaced ? ' (replaced existing entry)' : '';
     toast(target === 'mine'
-      ? `Imported ${reviews.length} reviews as your pharmacy`
-      : `Stored ${reviews.length} reviews for ${name}`, 'good');
+      ? `Imported ${reviews.length} reviews as your pharmacy${replacedNote}`
+      : `Stored ${reviews.length} reviews for ${name}${replacedNote}`, 'good');
   } catch (e) {
     toast('Import failed: ' + (e.message || e), 'err');
   } finally {
